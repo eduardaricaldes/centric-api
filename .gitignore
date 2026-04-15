@@ -1,0 +1,29 @@
+# Ambiente virtual
+venv/
+.env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Alembic
+migrations/versions/*.pyc
+
+# Logs e arquivos temporários
+*.log
+*.sqlite3
+
+# IDEs e editores
+.vscode/
+.idea/
+.DS_Store
+
+# Arquivos de ambiente
+.env
+
+# Docker
+*.pid
+*.seed
