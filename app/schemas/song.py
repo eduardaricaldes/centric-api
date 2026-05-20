@@ -14,11 +14,11 @@ class SongCreate(SongBase):
     pass
 
 class SongUpdate(BaseModel):
-    title:str
-    artist:str
-    lyrics:str
-    tone: str
-    category: str
+    title:Optional[str] = None
+    artist:Optional[str] = None
+    lyrics:Optional[str] = None
+    tone: Optional[str] = None
+    category: Optional[str] = None
 
 class SongResponse(SongBase):
     id:int

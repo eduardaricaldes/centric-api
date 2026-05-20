@@ -1,18 +1,20 @@
 from typing import Optional
 
-from fastapi import Depends, FastAPI, APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import text
+from fastapi import Depends, APIRouter, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.core.database import engine, get_db
+from app.core.database import  get_db
+from app.core.dependencies import get_current_user, require_admin
 from app.models.song import Song
+from app.models.user import User
 from app.schemas.song import SongCreate, SongListResponse, SongResponse, SongUpdate
 
 songs_router = APIRouter(prefix="/songs", tags=["Songs"])
 
 # CREATE
 @songs_router.post("/", response_model=SongResponse, status_code=status.HTTP_201_CREATED)
-def create_song(payload: SongCreate, db:Session = Depends (get_db)):
+def create_song(payload: SongCreate, db:Session = Depends (get_db), admin: User = Depends(require_admin)
+):
     song = Song(**payload.model_dump())
     db.add(song)
     db.commit()
@@ -28,14 +30,19 @@ def create_song(payload: SongCreate, db:Session = Depends (get_db)):
 @songs_router.get("/", response_model=SongListResponse)
 def get_songs(
     search: Optional[str] = None,
+    artist: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+  
 ):
     query = db.query(Song)
 
     if search:
         query = query.filter(Song.title.ilike(f"%{search}%"))
+    if artist:
+        query = query.filter(Song.artist.ilike(f"%{artist}%"))
     total = query.count()
 
     if search and total == 0:
@@ -63,7 +70,7 @@ def get_songs(
 
 # GET BY ID
 @songs_router.get("/{song_id}", response_model = SongResponse)
-def get_song(song_id:int, db:Session = Depends(get_db)):
+def get_song(song_id:int, db:Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     song = db.query(Song).filter(Song.id == song_id).first()
     if not song:
         raise HTTPException(status_code=404, detail="Song Not Found")
@@ -76,21 +83,32 @@ def get_song(song_id:int, db:Session = Depends(get_db)):
 #O raise é utilizado para lançar uma exceção, interrompendo imediatamente a execução da função.
 
 # UPDATE (PUT)
-@songs_router.put("/{song_id}", response_model= SongResponse)
-def update_song(song_id:int, payload: SongUpdate, db:Session = Depends(get_db)):
+@songs_router.put("/{song_id}", response_model=SongResponse)
+def update_song(
+    song_id: int,
+    payload: SongCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
     song = db.query(Song).filter(Song.id == song_id).first()
+
     if not song:
         raise HTTPException(status_code=404, detail="Song Not Found")
-    for key, value in payload.model_dump(exclude_unset=True).items(): # entender melhor 
-        setattr(song, key, value)
-    
+
+    song.title = payload.title
+    song.lyrics = payload.lyrics
+    song.artist = payload.artist
+    song.tone = payload.tone
+    song.category = payload.category
+
     db.commit()
     db.refresh(song)
+
     return song
 
 # DELETE
 @songs_router.delete("/{song_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_song(song_id: int, db:Session = Depends(get_db)):
+def delete_song(song_id: int, db:Session = Depends(get_db), admin: User = Depends(require_admin)):
     song = db.query(Song).filter(Song.id == song_id).first()
     if not song:
         raise HTTPException(status_code= 404, detail="Song not found")
@@ -99,8 +117,9 @@ def delete_song(song_id: int, db:Session = Depends(get_db)):
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+#PATCH
 @songs_router.patch("/{song_id}", response_model=SongResponse)
-def patch_song(song_id: int, payload: SongUpdate, db:Session = Depends(get_db)):
+def patch_song(song_id: int, payload: SongUpdate, db:Session = Depends(get_db),admin: User = Depends(require_admin)):
     song = db.query(Song).filter(Song.id == song_id).first()
     if song is None:
         raise HTTPException(
@@ -117,3 +136,9 @@ def patch_song(song_id: int, payload: SongUpdate, db:Session = Depends(get_db)):
     db.refresh(song)
 
     return song
+
+# {
+#   "name": "eduarda",
+#   "email": "eduarda@example.com",
+#   "password": "1234"
+# }

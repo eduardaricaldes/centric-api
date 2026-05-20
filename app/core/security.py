@@ -14,11 +14,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password) # -> funcao criada para verificar se a senha criada e igual a senha criptografada e que deve retornar true ou false
 
 def create_access_token(data:dict) -> str:
-    to_enconde = data.copy() # -> funcao de criar o token 
+    to_encode = data.copy() # -> funcao de criar o token 
     expire = datetime.now(timezone.utc)+timedelta(minutes=settings.access_token_expire_minutes) # -> expiracao 
-    to_enconde.update({"exp":expire}) # -> add o payload 
+    to_encode.update({"exp":expire}) # -> add o payload 
     return jwt.encode(
-        to_enconde,
+        to_encode,
         settings.secret_key,
         algorithm = settings.algorithm,
     )
