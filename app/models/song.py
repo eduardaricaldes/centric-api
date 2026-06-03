@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import String, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
@@ -17,6 +18,8 @@ class Song(Base):
     category: Mapped[str | None] = mapped_column(Text,nullable=True)
     tone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    playlist_items = relationship("PlaylistSong", back_populates="song")
 
     
     created_at: Mapped[datetime] = mapped_column(

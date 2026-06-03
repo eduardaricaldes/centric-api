@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.api.songs import songs_router
 from app.core.database import engine
 from app.api.auth import router as auth_router
+from app.api.playlists import playlist_router
 
 app = FastAPI(title="Centric API")
 
@@ -23,3 +24,5 @@ def health_db():
 # Inclusão das rotas de songs
 app.include_router(songs_router)
 app.include_router(auth_router)
+app.include_router(playlist_router)
+
