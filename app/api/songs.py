@@ -9,9 +9,23 @@ from app.models.song import Song
 from app.models.user import User
 from app.schemas.song import SongCreate, SongListResponse, SongResponse, SongUpdate
 from app.services.chordpro import to_plain_lyrics
-from app.services.song_views import resolve_song_view, song_for_view
+from app.services.song_views import resolve_song_view, song_detail, song_for_view
 
 songs_router = APIRouter(prefix="/songs", tags=["Songs"])
+
+
+def resolve_read_view(
+    view: Literal["lyrics", "chords"] | None,
+    transpose: int | None,
+    current_user: User,
+) -> Literal["lyrics", "chords"]:
+    selected_view = resolve_song_view(view, current_user)
+    if transpose is not None and selected_view != "chords":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="transpose is only valid with chords view",
+        )
+    return selected_view
 
 # CREATE
 @songs_router.post("/", response_model=SongResponse, status_code=status.HTTP_201_CREATED)
@@ -40,12 +54,14 @@ def get_songs(
     search: Optional[str] = None,
     artist: Optional[str] = None,
     view: Literal["lyrics", "chords"] | None = Query(default=None),
+    transpose: int | None = Query(default=None, ge=-11, le=11),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
   
 ):
+    selected_view = resolve_read_view(view, transpose, current_user)
     query = db.query(Song)
 
     if search:
@@ -69,13 +85,14 @@ def get_songs(
     )
 
 
-    selected_view = resolve_song_view(view, current_user)
-
     return {
         "total": total,
         "page": page,
         "limit": limit,
-        "items": [song_for_view(song, selected_view) for song in songs],
+        "items": [
+            song_for_view(song, selected_view, semitones=transpose)
+            for song in songs
+        ],
     }
 
 
@@ -84,15 +101,16 @@ def get_songs(
 def get_song(
     song_id: int,
     view: Literal["lyrics", "chords"] | None = Query(default=None),
+    transpose: int | None = Query(default=None, ge=-11, le=11),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     # O detalhe sempre traz os dois campos para o front alternar sem nova requisição.
-    resolve_song_view(view, current_user)
+    selected_view = resolve_read_view(view, transpose, current_user)
     song = db.query(Song).filter(Song.id == song_id).first()
     if not song:
         raise HTTPException(status_code=404, detail="Song Not Found")
-    return song
+    return song_detail(song, selected_view, semitones=transpose)
 
 #.first() do SQLAlchemy retorna o primeiro registro encontrado no filtro 
 # SELECT * FROM songs WHERE id = 1 LIMIT 1 - .first() adiciona implicitamente um 

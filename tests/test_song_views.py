@@ -68,6 +68,107 @@ def test_view_invalida_retorna_422(client):
     assert client.get("/songs/", params={"view": "tabs"}).status_code == 422
 
 
+def test_transpose_muda_cifra_e_tom_na_listagem(client):
+    create_song_with_chords(client)
+
+    item = client.get(
+        "/songs/",
+        params={"view": "chords", "transpose": 2},
+    ).json()["items"][0]
+
+    assert item["chordpro"] == "[A]Graça que me [E]alcançou"
+    assert item["tone"] == "A"
+    assert "lyrics" not in item
+
+    original = client.get(
+        "/songs/",
+        params={"view": "chords"},
+    ).json()["items"][0]
+    assert original["chordpro"] == "[G]Graça que me [D]alcançou"
+    assert original["tone"] == "G"
+
+
+def test_transpose_no_detalhe_preserva_letra_e_muda_cifra_e_tom(client):
+    song = create_song_with_chords(client)
+
+    response = client.get(
+        f"/songs/{song['id']}",
+        params={"view": "chords", "transpose": -2},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["lyrics"] == "Graça que me alcançou"
+    assert response.json()["chordpro"] == "[F]Graça que me [C]alcançou"
+    assert response.json()["tone"] == "F"
+
+
+def test_transpose_exige_visualizacao_de_cifra(client):
+    song = create_song_with_chords(client)
+
+    list_response = client.get(
+        "/songs/",
+        params={"view": "lyrics", "transpose": 2},
+    )
+    detail_response = client.get(
+        f"/songs/{song['id']}",
+        params={"transpose": 2},
+    )
+
+    assert list_response.status_code == 422
+    assert detail_response.status_code == 422
+
+
+def test_musico_pode_transpor_sem_view_explicita(
+    client,
+    current_user,
+    db_session,
+):
+    create_song_with_chords(client)
+    current_user.is_musician = True
+    db_session.commit()
+
+    item = client.get("/songs/", params={"transpose": 2}).json()["items"][0]
+
+    assert item["chordpro"] == "[A]Graça que me [E]alcançou"
+    assert item["tone"] == "A"
+
+
+def test_transpose_aceita_apenas_intervalo_de_menos_11_a_11(client):
+    create_song_with_chords(client)
+
+    for semitones in (-11, 11):
+        response = client.get(
+            "/songs/",
+            params={"view": "chords", "transpose": semitones},
+        )
+        assert response.status_code == 200
+
+    for semitones in (-12, 12):
+        response = client.get(
+            "/songs/",
+            params={"view": "chords", "transpose": semitones},
+        )
+        assert response.status_code == 422
+
+
+def test_detalhe_em_chords_sem_cifra_cai_para_letra(client):
+    create_response = client.post(
+        "/songs/",
+        json={"title": "Sem Cifra", "lyrics": "Somente a letra", "tone": "C"},
+    )
+    song_id = create_response.json()["id"]
+
+    response = client.get(
+        f"/songs/{song_id}",
+        params={"view": "chords", "transpose": 2},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["lyrics"] == "Somente a letra"
+    assert response.json()["chordpro"] == "Somente a letra"
+    assert response.json()["tone"] == "D"
+
+
 def test_playlist_respeita_view_no_detalhe_e_na_rota_aninhada(
     client,
     playlist_id,
