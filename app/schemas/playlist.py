@@ -12,18 +12,20 @@ class PlaylistBase(BaseModel):
 
 
 class PlaylistCreate(PlaylistBase):
-    pass
+    event_id: int | None = None
 
 
 class PlaylistUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     date: date_type | None = None
     description: str | None = None
+    event_id: int | None = None
 
 
 class PlaylistResponse(PlaylistBase):
     id: int
     created_by: int
+    event_id: int | None
     created_at: datetime
     updated_at: datetime
 

@@ -22,6 +22,13 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserSummary(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 class UserUpdate(BaseModel):
     is_musician: bool
 

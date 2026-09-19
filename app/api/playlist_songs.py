@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.playlists import get_playlist_or_404
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user
 from app.models.playlist_song import PlaylistSong
 from app.models.song import Song
 from app.models.user import User
@@ -17,6 +17,7 @@ from app.schemas.playlist_song import (
     PlaylistSongWithSongViewResponse,
 )
 from app.services.song_views import resolve_song_view, song_for_view
+from app.services.permissions import ensure_playlist_manager
 
 playlist_songs_router = APIRouter(
     prefix="/playlist/{playlist_id}/songs",
@@ -82,9 +83,10 @@ def add_song_to_playlist(
     playlist_id: int,
     payload: PlaylistSongCreate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    get_playlist_or_404(db, playlist_id)
+    playlist = get_playlist_or_404(db, playlist_id)
+    ensure_playlist_manager(db, current_user, playlist)
 
     song = db.query(Song).filter(Song.id == payload.song_id).first()
     if song is None:
@@ -127,9 +129,10 @@ def move_playlist_song(
     item_id: int,
     payload: PlaylistSongUpdate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    get_playlist_or_404(db, playlist_id)
+    playlist = get_playlist_or_404(db, playlist_id)
+    ensure_playlist_manager(db, current_user, playlist)
 
     items = get_items_ordered(db, playlist_id)
     item = next((i for i in items if i.id == item_id), None)
@@ -157,9 +160,10 @@ def reorder_playlist_songs(
     playlist_id: int,
     payload: PlaylistSongReorder,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    get_playlist_or_404(db, playlist_id)
+    playlist = get_playlist_or_404(db, playlist_id)
+    ensure_playlist_manager(db, current_user, playlist)
 
     items = get_items_ordered(db, playlist_id)
     items_by_id = {item.id: item for item in items}
@@ -182,9 +186,10 @@ def remove_song_from_playlist(
     playlist_id: int,
     item_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    get_playlist_or_404(db, playlist_id)
+    playlist = get_playlist_or_404(db, playlist_id)
+    ensure_playlist_manager(db, current_user, playlist)
 
     item = (
         db.query(PlaylistSong)

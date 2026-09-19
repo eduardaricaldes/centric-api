@@ -1,5 +1,8 @@
+from app.models.assignment import Assignment as Assignment
+from app.models.event import Event as Event
 from app.models.ministry import Ministry as Ministry
 from app.models.ministry_member import MinistryMember as MinistryMember
+from app.models.preaching import Preaching as Preaching
 from app.models.song import Song as Song
 from app.models.user import User as User
 from app.models.playlist import Playlist as Playlist

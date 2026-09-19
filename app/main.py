@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.songs import songs_router
+from app.api.assignments import assignments_router
+from app.api.events import events_router
 from app.core.config import settings
 from app.core.database import engine
 from app.api.auth import router as auth_router
@@ -36,4 +38,5 @@ app.include_router(songs_router)
 app.include_router(auth_router)
 app.include_router(playlist_router)
 app.include_router(playlist_songs_router)
-
+app.include_router(events_router)
+app.include_router(assignments_router)

@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user
+from app.models.event import Event
 from app.models.playlist import Playlist
+from app.models.roles import UserRole
 from app.models.user import User
 from app.schemas.playlist import (
     PlaylistCreate,
@@ -16,6 +18,7 @@ from app.schemas.playlist import (
 )
 from app.schemas.playlist_song import PlaylistSongResponse
 from app.services.song_views import resolve_song_view, song_for_view
+from app.services.permissions import ensure_event_manager, ensure_playlist_manager
 
 playlist_router = APIRouter(prefix="/playlist", tags=["Playlists"])
 
@@ -31,6 +34,29 @@ def get_playlist_or_404(db: Session, playlist_id: int) -> Playlist:
     return playlist
 
 
+def validate_event_link(
+    db: Session,
+    event_id: int,
+    current_user: User,
+    playlist_id: int | None = None,
+) -> Event:
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    ensure_event_manager(db, current_user, event)
+
+    linked_query = db.query(Playlist).filter(Playlist.event_id == event_id)
+    if playlist_id is not None:
+        linked_query = linked_query.filter(Playlist.id != playlist_id)
+    if linked_query.first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Event already has a playlist",
+        )
+    return event
+
+
 # CREATE
 @playlist_router.post(
     "/",
@@ -40,13 +66,24 @@ def get_playlist_or_404(db: Session, playlist_id: int) -> Playlist:
 def create_playlist(
     payload: PlaylistCreate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    if current_user.role not in {UserRole.ADMIN, UserRole.LEADER}:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    if current_user.role == UserRole.LEADER and payload.event_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Leaders must link playlists to an event they manage",
+        )
+    if payload.event_id is not None:
+        validate_event_link(db, payload.event_id, current_user)
+
     playlist = Playlist(
         title=payload.title,
         date=payload.date,
         description=payload.description,
-        created_by=admin.id,
+        event_id=payload.event_id,
+        created_by=current_user.id,
     )
     db.add(playlist)
     db.commit()
@@ -131,11 +168,19 @@ def update_playlist(
     playlist_id: int,
     payload: PlaylistUpdate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
     playlist = get_playlist_or_404(db, playlist_id)
+    ensure_playlist_manager(db, current_user, playlist)
 
     update_data = payload.model_dump(exclude_unset=True)
+    if update_data.get("event_id") is not None:
+        validate_event_link(
+            db,
+            update_data["event_id"],
+            current_user,
+            playlist_id=playlist.id,
+        )
 
     for key, value in update_data.items():
         setattr(playlist, key, value)
@@ -151,9 +196,10 @@ def update_playlist(
 def delete_playlist(
     playlist_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
     playlist = get_playlist_or_404(db, playlist_id)
+    ensure_playlist_manager(db, current_user, playlist)
 
     # as músicas da playlist saem junto (cascade), as músicas do catálogo continuam
     db.delete(playlist)
