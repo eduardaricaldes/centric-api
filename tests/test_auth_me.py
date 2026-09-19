@@ -38,3 +38,4 @@ def test_usuario_pode_se_registrar_como_musico(client):
 
     assert response.status_code == 201
     assert response.json()["is_musician"] is True
+    assert response.json()["role"] == "MEMBER"

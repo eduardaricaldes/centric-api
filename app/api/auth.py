@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.security import create_access_token, hash_password
+from app.models.roles import UserRole
 from app.models.user import User
 from app.schemas.user import Token, UserCreate, UserResponse, UserUpdate
 
@@ -25,7 +26,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         name=payload.name,
         email=payload.email,
         password_hash=hash_password(payload.password),
-        role="USER",
+        role=UserRole.MEMBER,
         is_musician=payload.is_musician,
     )
     db.add(user)
@@ -63,11 +64,11 @@ def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = 
     access_token = create_access_token(
     data={
         "sub": user.email,
-        "role": user.role,
+        "role": user.role.value,
     }
 )
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "role": user.role
+        "role": user.role.value,
     }

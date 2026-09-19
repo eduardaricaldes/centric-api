@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import engine
 from app.core.security import hash_password
+from app.models.roles import UserRole
 from app.models.user import User
 
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
@@ -27,7 +28,7 @@ with Session(engine) as db:
         name=ADMIN_NAME,
         email=ADMIN_EMAIL,
         password_hash=hash_password(ADMIN_PASSWORD),
-        role="ADMIN",
+        role=UserRole.ADMIN,
     )
     db.add(admin)
     db.commit()

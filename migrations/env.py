@@ -11,6 +11,8 @@ from app.models.song import Song  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.playlist import Playlist  # noqa: F401
 from app.models.playlist_song import PlaylistSong  # noqa: F401
+from app.models.ministry import Ministry  # noqa: F401
+from app.models.ministry_member import MinistryMember  # noqa: F401
 
 
 # this is the Alembic Config object, which provides

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr
 
+from app.models.roles import UserRole
+
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
@@ -14,7 +16,7 @@ class UserResponse(BaseModel):
     id: int
     name: str
     email: EmailStr
-    role: str
+    role: UserRole
     is_musician: bool
 
     model_config = {"from_attributes": True}
@@ -26,4 +28,4 @@ class UserUpdate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    role: str
+    role: UserRole

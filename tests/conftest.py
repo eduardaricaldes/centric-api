@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.main import app
+from app.models.roles import UserRole
 from app.models.user import User
 
 ADMIN_EMAIL = "admin@comunidadenorth.com"
@@ -72,7 +73,7 @@ def db_session(engine):
             name="Admin",
             email=ADMIN_EMAIL,
             password_hash="x",
-            role="ADMIN",
+            role=UserRole.ADMIN,
         )
     )
     session.commit()
