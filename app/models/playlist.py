@@ -10,7 +10,7 @@ class Playlist(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    title = Column(String, nullable=False)
+    title = Column(String(255), nullable=False)
     date = Column(Date, nullable=False)
     description = Column(Text, nullable=True)
 
@@ -26,5 +26,6 @@ class Playlist(Base):
     songs = relationship(
         "PlaylistSong",
         back_populates="playlist",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        order_by="PlaylistSong.position",
     )

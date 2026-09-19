@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 class SongBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     lyrics: str = Field(..., min_length=1)
-    artist: Optional[str] = None,Field(default=None, max_length=255)
-    tone: Optional[str] = None, Field(default=None, max_length=50)
-    category: Optional[str] = None,Field(default=None, max_length=100)
+    artist: Optional[str] = Field(default=None, max_length=255)
+    tone: Optional[str] = Field(default=None, max_length=50)
+    category: Optional[str] = Field(default=None, max_length=100)
 
 class SongCreate(SongBase):
     pass

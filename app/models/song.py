@@ -14,8 +14,7 @@ class Song(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     artist: Mapped[str | None] = mapped_column(String(255),nullable=True)
-    lyrics: Mapped[str | None] = mapped_column(Text,nullable=True)
-    category: Mapped[str | None] = mapped_column(Text,nullable=True)
+    lyrics: Mapped[str] = mapped_column(Text, nullable=False)
     tone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
 

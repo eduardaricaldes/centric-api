@@ -1,12 +1,13 @@
-from datetime import date, datetime
+from datetime import date as date_type, datetime
+
 from pydantic import BaseModel, Field
 
-from app.schemas.playlist_song import PlaylistSongResponse
+from app.schemas.playlist_song import PlaylistSongWithSongResponse
 
 
 class PlaylistBase(BaseModel):
-    title: str = Field(..., min_length=1)
-    date: datetime
+    title: str = Field(..., min_length=1, max_length=255)
+    date: date_type
     description: str | None = None
 
 
@@ -15,8 +16,8 @@ class PlaylistCreate(PlaylistBase):
 
 
 class PlaylistUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1)
-    date:datetime | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    date: date_type | None = None
     description: str | None = None
 
 
@@ -32,4 +33,12 @@ class PlaylistResponse(PlaylistBase):
 
 
 class PlaylistDetailResponse(PlaylistResponse):
-    songs: list[PlaylistSongResponse] = []
+    """Playlist com as músicas já ordenadas por position (usado no GET /playlist/{id})."""
+    songs: list[PlaylistSongWithSongResponse] = []
+
+
+class PlaylistListResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    items: list[PlaylistResponse]

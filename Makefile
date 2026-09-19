@@ -1,4 +1,4 @@
-.PHONY: run dev install freeze migrate revision up down logs test lint format
+.PHONY: run dev install freeze migrate revision up down logs test lint format seed-admin
 
 run:
 	uvicorn app.main:app --reload
@@ -35,3 +35,6 @@ lint:
 
 format:
 	ruff format .
+
+seed-admin:
+	venv/bin/python3.11 scripts/seed_admin.py
