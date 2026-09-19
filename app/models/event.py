@@ -17,9 +17,12 @@ from app.core.database import Base
 
 
 class EventType(StrEnum):
-    SUNDAY_SERVICE = "CULTO_DOMINGO"
+    SERVICE = "CULTO"
     REHEARSAL = "ENSAIO"
-    EVENT = "EVENTO"
+    FELLOWSHIP = "CONFRATERNIZACAO"
+    MISSION = "ACAO_MISSIONARIA"
+    SPECIAL = "EVENTO_ESPECIAL"
+    OTHER = "OUTRO"
 
 
 class EventStatus(StrEnum):
@@ -33,7 +36,7 @@ event_type = SQLAlchemyEnum(
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
-    length=13,
+    length=16,
     values_callable=lambda enum: [item.value for item in enum],
 )
 

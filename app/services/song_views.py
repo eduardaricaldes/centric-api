@@ -11,7 +11,7 @@ SongView: TypeAlias = Literal["lyrics", "chords"]
 def resolve_song_view(view: SongView | None, current_user: User) -> SongView:
     if view is not None:
         return view
-    return "chords" if current_user.is_musician else "lyrics"
+    return "chords" if current_user.prefers_chords else "lyrics"
 
 
 def _transpose_tone(tone: str | None, semitones: int) -> str | None:

@@ -52,7 +52,7 @@ def create_event(client, *, title: str, date: str) -> dict:
             "title": title,
             "date": date,
             "time": "19:00:00",
-            "type": "CULTO_DOMINGO",
+            "type": "CULTO",
         },
     )
     assert response.status_code == 201, response.text

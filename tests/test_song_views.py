@@ -30,7 +30,7 @@ def test_musico_recebe_cifra_por_padrao_e_pode_pedir_letra(
     db_session,
 ):
     create_song_with_chords(client)
-    current_user.is_musician = True
+    current_user.prefers_chords = True
     db_session.commit()
 
     default_item = client.get("/songs/").json()["items"][0]
@@ -124,7 +124,7 @@ def test_musico_pode_transpor_sem_view_explicita(
     db_session,
 ):
     create_song_with_chords(client)
-    current_user.is_musician = True
+    current_user.prefers_chords = True
     db_session.commit()
 
     item = client.get("/songs/", params={"transpose": 2}).json()["items"][0]
@@ -206,7 +206,7 @@ def test_playlist_usa_preferencia_de_musico_sem_view_explicita(
         f"/playlist/{playlist_id}/songs/",
         json={"song_id": song["id"]},
     )
-    current_user.is_musician = True
+    current_user.prefers_chords = True
     db_session.commit()
 
     detail_song = client.get(f"/playlist/{playlist_id}").json()["songs"][0]["song"]

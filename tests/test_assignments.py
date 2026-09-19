@@ -26,7 +26,7 @@ def create_event(client) -> int:
             "title": "Culto",
             "date": "2026-10-04",
             "time": "19:00:00",
-            "type": "CULTO_DOMINGO",
+            "type": "CULTO",
         },
     )
     assert response.status_code == 201

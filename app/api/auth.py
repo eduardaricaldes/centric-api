@@ -27,7 +27,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         email=payload.email,
         password_hash=hash_password(payload.password),
         role=UserRole.MEMBER,
-        is_musician=payload.is_musician,
+        prefers_chords=payload.prefers_chords,
     )
     db.add(user)
     db.commit()
@@ -47,7 +47,7 @@ def update_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    current_user.is_musician = payload.is_musician
+    current_user.prefers_chords = payload.prefers_chords
     db.commit()
     db.refresh(current_user)
     return current_user

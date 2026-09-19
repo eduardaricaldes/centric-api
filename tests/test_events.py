@@ -25,7 +25,7 @@ def create_event(client, **overrides) -> dict:
         "title": "Culto de domingo",
         "date": "2026-10-04",
         "time": "19:00:00",
-        "type": "CULTO_DOMINGO",
+        "type": "CULTO",
     }
     payload.update(overrides)
     response = client.post("/events/", json=payload)
@@ -83,7 +83,7 @@ def test_member_nao_cria_evento(client, db_session):
             "title": "Sem permissão",
             "date": "2026-10-04",
             "time": "19:00:00",
-            "type": "EVENTO",
+            "type": "EVENTO_ESPECIAL",
         },
     )
 
@@ -201,6 +201,43 @@ def test_lider_nao_pode_editar_nem_apagar_evento_de_outro(client, db_session):
 
     r = client.delete(f"/events/{event['id']}")
     assert r.status_code == 403
+
+
+def test_confraternizacao_com_escala_sem_playlist_e_sem_pregacao(client, db_session):
+    ministry = Ministry(name="Cozinha")
+    db_session.add(ministry)
+    db_session.commit()
+
+    r = client.post(
+        "/events/",
+        json={
+            "title": "Confraternização de Aniversário",
+            "date": "2026-12-14",
+            "time": "12:00:00",
+            "type": "CONFRATERNIZACAO",
+        },
+    )
+    assert r.status_code == 201
+    event_id = r.json()["id"]
+    assert r.json()["type"] == "CONFRATERNIZACAO"
+
+    volunteer = create_user(db_session, "volunteer-conf@example.com")
+    r = client.post(
+        f"/events/{event_id}/assignments",
+        json={"user_id": volunteer.id, "ministry_id": ministry.id, "function": "Cozinha"},
+    )
+    assert r.status_code == 201
+
+    list_r = client.get("/events/", params={"type": "CONFRATERNIZACAO"})
+    assert list_r.status_code == 200
+    assert list_r.json()["total"] == 1
+
+    detail_r = client.get(f"/events/{event_id}")
+    assert detail_r.status_code == 200
+    body = detail_r.json()
+    assert len(body["assignments"]) == 1
+    assert body["preaching"] is None
+    assert body["playlist"] is None
 
 
 def test_excluir_evento_preserva_playlist_desvinculada(client, db_session):

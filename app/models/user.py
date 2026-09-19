@@ -17,7 +17,7 @@ class User(Base):
         default=UserRole.MEMBER,
         server_default=UserRole.MEMBER.value,
     )
-    is_musician = Column(Boolean, nullable=False, server_default="false", default=False)
+    prefers_chords = Column(Boolean, nullable=False, server_default="false", default=False)
 
     ministry_memberships = relationship(
         "MinistryMember",

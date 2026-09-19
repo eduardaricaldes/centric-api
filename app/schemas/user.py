@@ -6,7 +6,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
-    is_musician: bool = False
+    prefers_chords: bool = False
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -17,7 +17,7 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     role: UserRole
-    is_musician: bool
+    prefers_chords: bool
 
     model_config = {"from_attributes": True}
 
@@ -30,7 +30,7 @@ class UserSummary(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    is_musician: bool
+    prefers_chords: bool
 
 class Token(BaseModel):
     access_token: str
