@@ -27,3 +27,6 @@ migrations/versions/*.pyc
 # Docker
 *.pid
 *.seed
+
+# Artefatos locais de análise de código
+graphify-out/

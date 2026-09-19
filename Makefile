@@ -37,4 +37,4 @@ format:
 	ruff format .
 
 seed-admin:
-	venv/bin/python3.11 scripts/seed_admin.py
+	python scripts/seed_admin.py

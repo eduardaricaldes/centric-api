@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.playlists import get_playlist_or_404
@@ -12,8 +14,9 @@ from app.schemas.playlist_song import (
     PlaylistSongReorder,
     PlaylistSongResponse,
     PlaylistSongUpdate,
-    PlaylistSongWithSongResponse,
+    PlaylistSongWithSongViewResponse,
 )
+from app.services.song_views import resolve_song_view, song_for_view
 
 playlist_songs_router = APIRouter(
     prefix="/playlist/{playlist_id}/songs",
@@ -38,21 +41,35 @@ def normalize_positions(items: list[PlaylistSong]) -> None:
 
 
 # LISTAR MÚSICAS DA PLAYLIST (com a letra, para o dia do culto)
-@playlist_songs_router.get("/", response_model=list[PlaylistSongWithSongResponse])
+@playlist_songs_router.get(
+    "/",
+    response_model=list[PlaylistSongWithSongViewResponse],
+    response_model_exclude_unset=True,
+)
 def list_playlist_songs(
     playlist_id: int,
+    view: Literal["lyrics", "chords"] | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     get_playlist_or_404(db, playlist_id)
 
-    return (
+    items = (
         db.query(PlaylistSong)
         .options(selectinload(PlaylistSong.song))
         .filter(PlaylistSong.playlist_id == playlist_id)
         .order_by(PlaylistSong.position)
         .all()
     )
+
+    selected_view = resolve_song_view(view, current_user)
+    response = []
+    for item in items:
+        item_data = PlaylistSongResponse.model_validate(item).model_dump()
+        item_data["song"] = song_for_view(item.song, selected_view)
+        response.append(item_data)
+
+    return response
 
 
 # ADICIONAR MÚSICA À PLAYLIST

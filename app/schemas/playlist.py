@@ -2,7 +2,7 @@ from datetime import date as date_type, datetime
 
 from pydantic import BaseModel, Field
 
-from app.schemas.playlist_song import PlaylistSongWithSongResponse
+from app.schemas.playlist_song import PlaylistSongWithSongViewResponse
 
 
 class PlaylistBase(BaseModel):
@@ -34,7 +34,7 @@ class PlaylistResponse(PlaylistBase):
 
 class PlaylistDetailResponse(PlaylistResponse):
     """Playlist com as músicas já ordenadas por position (usado no GET /playlist/{id})."""
-    songs: list[PlaylistSongWithSongResponse] = []
+    songs: list[PlaylistSongWithSongViewResponse] = []
 
 
 class PlaylistListResponse(BaseModel):

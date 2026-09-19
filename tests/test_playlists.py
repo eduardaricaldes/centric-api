@@ -22,7 +22,7 @@ def test_get_por_id_traz_playlist_com_letras_na_ordem(client, playlist_id, song_
 def test_update_parcial_mantem_os_outros_campos(client, playlist_id):
     response = client.put(f"/playlist/{playlist_id}", json={"description": "Culto de Natal"})
     assert response.status_code == 200
-    assert response.json()["title"] == "Culto de Domingo à Noite"
+    assert response.json()["title"] == "Culto de Quinta"
     assert response.json()["description"] == "Culto de Natal"
 
 

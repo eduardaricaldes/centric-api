@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.schemas.song import SongResponse
+from app.schemas.song import SongResponse, SongViewResponse
 
 
 class PlaylistSongBase(BaseModel):
@@ -39,3 +39,7 @@ class PlaylistSongResponse(BaseModel):
 
 class PlaylistSongWithSongResponse(PlaylistSongResponse):
     song: SongResponse
+
+
+class PlaylistSongWithSongViewResponse(PlaylistSongResponse):
+    song: SongViewResponse

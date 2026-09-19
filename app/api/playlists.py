@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, selectinload
 
@@ -12,6 +14,8 @@ from app.schemas.playlist import (
     PlaylistResponse,
     PlaylistUpdate,
 )
+from app.schemas.playlist_song import PlaylistSongResponse
+from app.services.song_views import resolve_song_view, song_for_view
 
 playlist_router = APIRouter(prefix="/playlist", tags=["Playlists"])
 
@@ -85,9 +89,14 @@ def list_playlists(
 
 
 # GET BY ID (com as músicas do culto, na ordem)
-@playlist_router.get("/{playlist_id}", response_model=PlaylistDetailResponse)
+@playlist_router.get(
+    "/{playlist_id}",
+    response_model=PlaylistDetailResponse,
+    response_model_exclude_unset=True,
+)
 def get_playlist(
     playlist_id: int,
+    view: Literal["lyrics", "chords"] | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -104,7 +113,16 @@ def get_playlist(
             detail="Playlist not found",
         )
 
-    return playlist
+    selected_view = resolve_song_view(view, current_user)
+    data = PlaylistResponse.model_validate(playlist).model_dump()
+    data["songs"] = []
+
+    for item in playlist.songs:
+        item_data = PlaylistSongResponse.model_validate(item).model_dump()
+        item_data["song"] = song_for_view(item.song, selected_view)
+        data["songs"].append(item_data)
+
+    return data
 
 
 # UPDATE

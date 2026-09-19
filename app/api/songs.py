@@ -1,24 +1,28 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import Depends, APIRouter, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.core.database import  get_db
+from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.song import Song
 from app.models.user import User
 from app.schemas.song import SongCreate, SongListResponse, SongResponse, SongUpdate
+from app.services.chordpro import to_plain_lyrics
+from app.services.song_views import resolve_song_view, song_for_view
 
 songs_router = APIRouter(prefix="/songs", tags=["Songs"])
 
 # CREATE
 @songs_router.post("/", response_model=SongResponse, status_code=status.HTTP_201_CREATED)
-def create_song(payload: SongCreate, db:Session = Depends (get_db), admin: User = Depends(require_admin)
-):
-    song = Song(**payload.model_dump())
+def create_song(payload: SongCreate, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    data = payload.model_dump()
+    if data.get("chordpro"):
+        data["lyrics"] = to_plain_lyrics(data["chordpro"])
+    song = Song(**data)
     db.add(song)
     db.commit()
-    db.refresh(song) 
+    db.refresh(song)
     return song
 
 ## payload contém os dados enviados pelo usuário.
@@ -27,10 +31,15 @@ def create_song(payload: SongCreate, db:Session = Depends (get_db), admin: User 
 ## Depends diz ao FastAPI: Antes de executar esta função, execute outra função e utilize o resultado dela aqui.
 
 # LIST
-@songs_router.get("/", response_model=SongListResponse)
+@songs_router.get(
+    "/",
+    response_model=SongListResponse,
+    response_model_exclude_unset=True,
+)
 def get_songs(
     search: Optional[str] = None,
     artist: Optional[str] = None,
+    view: Literal["lyrics", "chords"] | None = Query(default=None),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -60,17 +69,26 @@ def get_songs(
     )
 
 
+    selected_view = resolve_song_view(view, current_user)
+
     return {
         "total": total,
         "page": page,
         "limit": limit,
-        "items": songs
+        "items": [song_for_view(song, selected_view) for song in songs],
     }
 
 
 # GET BY ID
-@songs_router.get("/{song_id}", response_model = SongResponse)
-def get_song(song_id:int, db:Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@songs_router.get("/{song_id}", response_model=SongResponse)
+def get_song(
+    song_id: int,
+    view: Literal["lyrics", "chords"] | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # O detalhe sempre traz os dois campos para o front alternar sem nova requisição.
+    resolve_song_view(view, current_user)
     song = db.query(Song).filter(Song.id == song_id).first()
     if not song:
         raise HTTPException(status_code=404, detail="Song Not Found")
@@ -88,22 +106,21 @@ def update_song(
     song_id: int,
     payload: SongCreate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
     song = db.query(Song).filter(Song.id == song_id).first()
-
     if not song:
         raise HTTPException(status_code=404, detail="Song Not Found")
 
-    song.title = payload.title
-    song.lyrics = payload.lyrics
-    song.artist = payload.artist
-    song.tone = payload.tone
-    song.category = payload.category
+    data = payload.model_dump()
+    if data.get("chordpro"):
+        data["lyrics"] = to_plain_lyrics(data["chordpro"])
+
+    for key, value in data.items():
+        setattr(song, key, value)
 
     db.commit()
     db.refresh(song)
-
     return song
 
 # DELETE
@@ -117,24 +134,22 @@ def delete_song(song_id: int, db:Session = Depends(get_db), admin: User = Depend
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-#PATCH
+# PATCH
 @songs_router.patch("/{song_id}", response_model=SongResponse)
-def patch_song(song_id: int, payload: SongUpdate, db:Session = Depends(get_db),admin: User = Depends(require_admin)):
+def patch_song(song_id: int, payload: SongUpdate, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     song = db.query(Song).filter(Song.id == song_id).first()
     if song is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="song not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="song not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+    if update_data.get("chordpro"):
+        update_data["lyrics"] = to_plain_lyrics(update_data["chordpro"])
 
     for key, value in update_data.items():
         setattr(song, key, value)
 
     db.commit()
     db.refresh(song)
-
     return song
 
 # {

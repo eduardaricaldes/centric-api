@@ -15,6 +15,7 @@ class Song(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     artist: Mapped[str | None] = mapped_column(String(255),nullable=True)
     lyrics: Mapped[str] = mapped_column(Text, nullable=False)
+    chordpro: Mapped[str | None] = mapped_column(Text, nullable=True)
     tone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
 

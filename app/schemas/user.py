@@ -4,6 +4,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
+    is_musician: bool = False
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -11,11 +12,16 @@ class UserLogin(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
+    name: str
     email: EmailStr
-    role:str
+    role: str
+    is_musician: bool
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+
+class UserUpdate(BaseModel):
+    is_musician: bool
 
 class Token(BaseModel):
     access_token: str
