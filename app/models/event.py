@@ -94,3 +94,9 @@ class Event(Base):
         passive_deletes=True,
         uselist=False,
     )
+    program_suggestions = relationship(
+        "ProgramSuggestion",
+        back_populates="event",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
