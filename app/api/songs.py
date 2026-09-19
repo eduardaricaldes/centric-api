@@ -70,11 +70,6 @@ def get_songs(
         query = query.filter(Song.artist.ilike(f"%{artist}%"))
     total = query.count()
 
-    if search and total == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="music not found"
-        ) 
     offset = (page - 1) * limit
 
     songs = (

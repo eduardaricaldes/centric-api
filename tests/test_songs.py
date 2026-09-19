@@ -13,6 +13,21 @@ def test_busca_por_titulo(client, song_ids):
     assert response.json()["total"] == 1
 
 
+def test_busca_sem_resultado_retorna_lista_vazia(client, song_ids):
+    response = client.get(
+        "/songs/",
+        params={"search": "Nao Existe", "page": 2, "limit": 3},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total": 0,
+        "page": 2,
+        "limit": 3,
+        "items": [],
+    }
+
+
 def test_create_com_chordpro_regenera_lyrics(client):
     cp = "[G]Antes de eu [D]falar"
     response = client.post(
