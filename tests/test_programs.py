@@ -312,7 +312,7 @@ def test_apply_invalido_preserva_playlist_existente(client, db_session, song_ids
     assert [item.song_id for item in items] == [song_ids[0]]
 
 
-def test_outro_lider_nao_sugere_programa_para_evento_alheio(
+def test_qualquer_lider_pode_sugerir_programa_para_qualquer_evento(
     client,
     db_session,
     song_ids,
@@ -330,10 +330,24 @@ def test_outro_lider_nao_sugere_programa_para_evento_alheio(
     response = client.post(
         f"/events/{event['id']}/program/suggest",
         json={
-            "briefing": "Tentativa em evento de outra pessoa",
+            "briefing": "Líder colaborando no evento de outro",
             "duracao_alvo_min": 60,
         },
     )
 
-    assert response.status_code == 403
-    assert provider.contexts == []
+    assert response.status_code == 201
+
+
+def test_membro_nao_pode_sugerir_programa(client, db_session, song_ids):
+    event = create_event(client, title="Culto do admin", date="2026-11-30")
+    member = create_user(db_session, "member-prog@example.com", UserRole.MEMBER)
+    app.dependency_overrides[get_current_user] = lambda: member
+    provider = FakeProvider(valid_draft(song_ids[0]))
+    configure_provider(provider)
+
+    response = client.post(
+        f"/events/{event['id']}/program/suggest",
+        json={"briefing": "Tentativa de acesso indevido", "duracao_alvo_min": 60},
+    )
+
+    assert response.status_code == 403, response.text

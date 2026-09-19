@@ -28,7 +28,7 @@ def ensure_ministry_manager(db: Session, user: User, ministry_id: int) -> None:
         )
 
 
-def ensure_event_manager(db: Session, user: User, event: Event) -> None:
+def ensure_event_owner(db: Session, user: User, event: Event) -> None:
     if user.role == UserRole.ADMIN:
         return
 
@@ -37,6 +37,16 @@ def ensure_event_manager(db: Session, user: User, event: Event) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Event manager access required",
         )
+
+
+def ensure_event_collaborator(db: Session, user: User, event: Event) -> None:
+    if user.role in {UserRole.ADMIN, UserRole.LEADER}:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Event manager access required",
+    )
 
 
 def ensure_playlist_manager(db: Session, user: User, playlist: Playlist) -> None:
@@ -49,7 +59,7 @@ def ensure_playlist_manager(db: Session, user: User, playlist: Playlist) -> None
     if playlist.event_id is not None:
         event = db.query(Event).filter(Event.id == playlist.event_id).first()
         if event is not None:
-            ensure_event_manager(db, user, event)
+            ensure_event_collaborator(db, user, event)
             return
 
     raise HTTPException(

@@ -52,6 +52,7 @@ def engine():
     _create_test_database_if_missing()
 
     engine = create_engine(TEST_DATABASE_URL)
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
 
     yield engine

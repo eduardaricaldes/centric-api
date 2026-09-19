@@ -26,7 +26,8 @@ from app.schemas.playlist import PlaylistResponse
 from app.schemas.playlist_song import PlaylistSongResponse
 from app.schemas.preaching import PreachingResponse, PreachingUpsert
 from app.services.permissions import (
-    ensure_event_manager,
+    ensure_event_collaborator,
+    ensure_event_owner,
     ensure_ministry_manager,
 )
 from app.services.song_views import resolve_song_view, song_for_view
@@ -179,7 +180,7 @@ def update_event(
     current_user: User = Depends(get_current_user),
 ):
     event = get_event_or_404(db, event_id)
-    ensure_event_manager(db, current_user, event)
+    ensure_event_owner(db, current_user, event)
 
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(event, key, value)
@@ -196,7 +197,7 @@ def delete_event(
     current_user: User = Depends(get_current_user),
 ):
     event = get_event_or_404(db, event_id)
-    ensure_event_manager(db, current_user, event)
+    ensure_event_owner(db, current_user, event)
     db.delete(event)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -261,7 +262,7 @@ def upsert_preaching(
     current_user: User = Depends(get_current_user),
 ):
     event = get_event_or_404(db, event_id)
-    ensure_event_manager(db, current_user, event)
+    ensure_event_collaborator(db, current_user, event)
 
     if db.query(User).filter(User.id == payload.preacher_id).first() is None:
         raise HTTPException(status_code=404, detail="User not found")

@@ -18,7 +18,7 @@ from app.schemas.playlist import (
 )
 from app.schemas.playlist_song import PlaylistSongResponse
 from app.services.song_views import resolve_song_view, song_for_view
-from app.services.permissions import ensure_event_manager, ensure_playlist_manager
+from app.services.permissions import ensure_event_collaborator, ensure_playlist_manager
 
 playlist_router = APIRouter(prefix="/playlist", tags=["Playlists"])
 
@@ -44,7 +44,7 @@ def validate_event_link(
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    ensure_event_manager(db, current_user, event)
+    ensure_event_collaborator(db, current_user, event)
 
     linked_query = db.query(Playlist).filter(Playlist.event_id == event_id)
     if playlist_id is not None:

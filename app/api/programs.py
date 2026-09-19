@@ -25,7 +25,7 @@ from app.services.ai_service import (
     ProgramSuggestionProvider,
     get_program_suggestion_provider,
 )
-from app.services.permissions import ensure_event_manager
+from app.services.permissions import ensure_event_collaborator
 from app.services.programs import (
     ProgramValidationError,
     build_program_context,
@@ -72,7 +72,7 @@ def suggest_program(
     provider: ProgramSuggestionProvider = Depends(get_program_suggestion_provider),
 ):
     event = get_event_or_404(db, event_id)
-    ensure_event_manager(db, current_user, event)
+    ensure_event_collaborator(db, current_user, event)
     context = build_program_context(
         db,
         event,
@@ -146,7 +146,7 @@ def apply_program(
     current_user: User = Depends(get_current_user),
 ):
     event = get_event_or_404(db, event_id)
-    ensure_event_manager(db, current_user, event)
+    ensure_event_collaborator(db, current_user, event)
     suggestion = (
         db.query(ProgramSuggestion)
         .filter(

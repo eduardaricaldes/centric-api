@@ -177,6 +177,32 @@ def test_detalhe_reune_escala_pregacao_playlist_e_aviso_de_conflito(
     ]
 
 
+def test_lider_monta_repertorio_de_culto_criado_pelo_admin(client, db_session):
+    event = create_event(client)
+
+    lider = create_user(db_session, "louvor@north.com", UserRole.LEADER)
+    app.dependency_overrides[get_current_user] = lambda: lider
+
+    r = client.post(
+        "/playlist/",
+        json={"title": "Repertório", "date": "2026-10-04", "event_id": event["id"]},
+    )
+    assert r.status_code == 201
+
+
+def test_lider_nao_pode_editar_nem_apagar_evento_de_outro(client, db_session):
+    event = create_event(client)
+
+    outro_lider = create_user(db_session, "outro@north.com", UserRole.LEADER)
+    app.dependency_overrides[get_current_user] = lambda: outro_lider
+
+    r = client.put(f"/events/{event['id']}", json={"title": "Tentativa"})
+    assert r.status_code == 403
+
+    r = client.delete(f"/events/{event['id']}")
+    assert r.status_code == 403
+
+
 def test_excluir_evento_preserva_playlist_desvinculada(client, db_session):
     event = create_event(client)
     playlist_response = client.post(
