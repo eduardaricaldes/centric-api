@@ -1,1 +1,1 @@
-from app.models.song import Song
+from app.models.song import Song as Song
