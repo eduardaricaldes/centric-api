@@ -18,6 +18,19 @@ class ProgramValidationError(ValueError):
     pass
 
 
+def get_recently_used_song_ids(db: Session, event: Event) -> set[int]:
+    """Returns IDs of songs used in the RECENT_HISTORY_DAYS before this event's date."""
+    history_start = event.date - timedelta(days=RECENT_HISTORY_DAYS)
+    rows = (
+        db.query(PlaylistSong.song_id)
+        .join(Playlist, Playlist.id == PlaylistSong.playlist_id)
+        .join(Event, Event.id == Playlist.event_id)
+        .filter(Event.date >= history_start, Event.date < event.date)
+        .all()
+    )
+    return {row.song_id for row in rows}
+
+
 def build_program_context(
     db: Session,
     event: Event,

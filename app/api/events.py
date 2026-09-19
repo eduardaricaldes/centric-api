@@ -30,6 +30,7 @@ from app.services.permissions import (
     ensure_event_owner,
     ensure_ministry_manager,
 )
+from app.services.programs import get_recently_used_song_ids
 from app.services.song_views import resolve_song_view, song_for_view
 
 events_router = APIRouter(prefix="/events", tags=["Events"])
@@ -74,6 +75,9 @@ def serialize_playlist(playlist: Playlist, selected_view: str) -> dict:
         item_data = PlaylistSongResponse.model_validate(item).model_dump()
         item_data["song"] = song_for_view(item.song, selected_view)
         data["songs"].append(item_data)
+    data["total_duration_min"] = sum(
+        item.song.duration_min or 0 for item in playlist.songs
+    )
     return data
 
 
@@ -169,6 +173,14 @@ def get_event(
     if event.playlist is not None:
         selected_view = resolve_song_view(view, current_user)
         data["playlist"] = serialize_playlist(event.playlist, selected_view)
+        recently_used = get_recently_used_song_ids(db, event)
+        for item in event.playlist.songs:
+            if item.song_id in recently_used:
+                data["warnings"].append({
+                    "code": "SONG_RECENTLY_USED",
+                    "message": "Song was used in a recent event",
+                    "song_id": item.song_id,
+                })
     return data
 
 

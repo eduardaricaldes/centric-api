@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import String, Text, DateTime
+from sqlalchemy import Integer, String, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -18,6 +18,7 @@ class Song(Base):
     chordpro: Mapped[str | None] = mapped_column(Text, nullable=True)
     tone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     playlist_items = relationship("PlaylistSong", back_populates="song")
 

@@ -40,8 +40,9 @@ class EventResponse(EventBase):
 class EventWarning(BaseModel):
     code: str
     message: str
-    user_id: int
-    ministry_ids: list[int]
+    user_id: int | None = None
+    ministry_ids: list[int] | None = None
+    song_id: int | None = None
 
 
 class EventDetailResponse(EventResponse):

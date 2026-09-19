@@ -240,6 +240,68 @@ def test_confraternizacao_com_escala_sem_playlist_e_sem_pregacao(client, db_sess
     assert body["playlist"] is None
 
 
+def test_total_duration_aparece_no_detalhe_do_evento(client):
+    event = create_event(client)
+    playlist = client.post(
+        "/playlist/",
+        json={"title": "Repertório", "date": "2026-10-04", "event_id": event["id"]},
+    ).json()
+
+    # dois songs com duration_min definido, um sem
+    s1 = client.post("/songs/", json={"title": "S1", "lyrics": "l", "duration_min": 5}).json()
+    s2 = client.post("/songs/", json={"title": "S2", "lyrics": "l", "duration_min": 8}).json()
+    s3 = client.post("/songs/", json={"title": "S3", "lyrics": "l"}).json()
+
+    for s in (s1, s2, s3):
+        client.post(f"/playlist/{playlist['id']}/songs/", json={"song_id": s["id"]})
+
+    body = client.get(f"/events/{event['id']}").json()
+    assert body["playlist"]["total_duration_min"] == 13
+
+
+def test_aviso_musica_usada_recentemente(client):
+    past_event = create_event(client, title="Culto passado", date="2026-09-28")
+    past_playlist = client.post(
+        "/playlist/",
+        json={"title": "Rep passado", "date": "2026-09-28", "event_id": past_event["id"]},
+    ).json()
+    song = client.post("/songs/", json={"title": "Graça", "lyrics": "letra"}).json()
+    client.post(f"/playlist/{past_playlist['id']}/songs/", json={"song_id": song["id"]})
+
+    current_event = create_event(client, title="Culto atual", date="2026-10-04")
+    current_playlist = client.post(
+        "/playlist/",
+        json={"title": "Rep atual", "date": "2026-10-04", "event_id": current_event["id"]},
+    ).json()
+    client.post(f"/playlist/{current_playlist['id']}/songs/", json={"song_id": song["id"]})
+
+    body = client.get(f"/events/{current_event['id']}").json()
+    song_warnings = [w for w in body["warnings"] if w["code"] == "SONG_RECENTLY_USED"]
+    assert len(song_warnings) == 1
+    assert song_warnings[0]["song_id"] == song["id"]
+
+
+def test_musica_fora_da_janela_de_28_dias_nao_gera_aviso(client):
+    old_event = create_event(client, title="Culto antigo", date="2026-08-01")
+    old_playlist = client.post(
+        "/playlist/",
+        json={"title": "Rep antigo", "date": "2026-08-01", "event_id": old_event["id"]},
+    ).json()
+    song = client.post("/songs/", json={"title": "Graça", "lyrics": "letra"}).json()
+    client.post(f"/playlist/{old_playlist['id']}/songs/", json={"song_id": song["id"]})
+
+    current_event = create_event(client, title="Culto atual", date="2026-10-04")
+    current_playlist = client.post(
+        "/playlist/",
+        json={"title": "Rep atual", "date": "2026-10-04", "event_id": current_event["id"]},
+    ).json()
+    client.post(f"/playlist/{current_playlist['id']}/songs/", json={"song_id": song["id"]})
+
+    body = client.get(f"/events/{current_event['id']}").json()
+    song_warnings = [w for w in body["warnings"] if w["code"] == "SONG_RECENTLY_USED"]
+    assert song_warnings == []
+
+
 def test_excluir_evento_preserva_playlist_desvinculada(client, db_session):
     event = create_event(client)
     playlist_response = client.post(

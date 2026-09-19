@@ -159,6 +159,9 @@ def get_playlist(
         item_data["song"] = song_for_view(item.song, selected_view)
         data["songs"].append(item_data)
 
+    data["total_duration_min"] = sum(
+        item.song.duration_min or 0 for item in playlist.songs
+    )
     return data
 
 

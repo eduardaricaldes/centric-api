@@ -37,6 +37,7 @@ class PlaylistResponse(PlaylistBase):
 class PlaylistDetailResponse(PlaylistResponse):
     """Playlist com as músicas já ordenadas por position (usado no GET /playlist/{id})."""
     songs: list[PlaylistSongWithSongViewResponse] = []
+    total_duration_min: int = 0
 
 
 class PlaylistListResponse(BaseModel):

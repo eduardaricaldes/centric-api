@@ -10,6 +10,7 @@ class SongBase(BaseModel):
     artist: Optional[str] = Field(default=None, max_length=255)
     tone: Optional[str] = Field(default=None, max_length=50)
     category: Optional[str] = Field(default=None, max_length=100)
+    duration_min: Optional[int] = Field(default=None, ge=1)
 
 class SongCreate(SongBase):
     pass
@@ -21,6 +22,7 @@ class SongUpdate(BaseModel):
     artist: Optional[str] = None
     tone: Optional[str] = None
     category: Optional[str] = None
+    duration_min: Optional[int] = Field(default=None, ge=1)
 
 class SongResponse(SongBase):
     id: int
@@ -38,6 +40,7 @@ class SongViewResponse(BaseModel):
     chordpro: Optional[str] = None
     tone: Optional[str] = None
     category: Optional[str] = None
+    duration_min: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
