@@ -1,4 +1,15 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -6,6 +17,14 @@ from app.core.database import Base
 
 class ProgramSuggestion(Base):
     __tablename__ = "program_suggestions"
+    __table_args__ = (
+        Index(
+            "uq_program_suggestions_pending_request_hash",
+            "request_hash",
+            unique=True,
+            postgresql_where=text("applied_at IS NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     event_id = Column(
@@ -17,7 +36,7 @@ class ProgramSuggestion(Base):
     briefing = Column(Text, nullable=False)
     duration_minutes = Column(Integer, nullable=False)
     response = Column(JSON, nullable=False)
-    request_hash = Column(String(64), nullable=False, unique=True, index=True)
+    request_hash = Column(String(64), nullable=False, index=True)
     provider_model = Column(String(100), nullable=False)
     requested_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 

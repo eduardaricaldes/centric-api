@@ -1,10 +1,14 @@
+import json
+import logging
 from types import SimpleNamespace
 
 import pytest
 
 from app.schemas.program import ProgramBlock, ProgramBlockType, ProgramDraft
 from app.services.ai_service import (
+    AIInvalidResponseError,
     AIServiceUnavailableError,
+    GeminiProgramDraft,
     GeminiProgramSuggestionProvider,
 )
 
@@ -79,5 +83,64 @@ def test_provider_usa_schema_estruturado_e_timeout(monkeypatch):
     assert captured["client"]["api_key"] == "secret"
     assert captured["client"]["http_options"].timeout == 12_000
     assert captured["request"]["model"] == "gemini-test"
-    assert captured["request"]["config"].response_schema is ProgramDraft
+    assert captured["request"]["config"].response_schema is GeminiProgramDraft
     assert "secret" not in captured["request"]["contents"]
+
+
+def test_schema_enviado_a_gemini_nao_tem_o_que_ela_recusa():
+    schema = json.dumps(GeminiProgramDraft.model_json_schema())
+
+    for keyword in ("additionalProperties", "maxLength", "minLength", "maxItems", "minimum"):
+        assert f'"{keyword}"' not in schema
+
+
+def test_resposta_da_gemini_passa_pela_validacao_do_program_draft(monkeypatch):
+    parsed = GeminiProgramDraft(
+        resumo="Sem música",
+        blocos=[{"ordem": 1, "tipo": "MUSICA", "duracao_min": 5}],
+    )
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return SimpleNamespace(parsed=parsed, text=None)
+
+    class FakeClient:
+        models = FakeModels()
+
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    monkeypatch.setattr("app.services.ai_service.genai.Client", FakeClient)
+    provider = GeminiProgramSuggestionProvider(
+        api_key="secret",
+        model_name="gemini-test",
+        timeout_seconds=12,
+    )
+
+    with pytest.raises(AIInvalidResponseError):
+        provider.suggest({"catalog": []})
+
+
+def test_falha_da_gemini_fica_no_log_sem_expor_a_chave(monkeypatch, caplog):
+    class FailingClient:
+        def __init__(self, **kwargs):
+            raise RuntimeError("400 INVALID_ARGUMENT")
+
+    monkeypatch.setattr("app.services.ai_service.genai.Client", FailingClient)
+    provider = GeminiProgramSuggestionProvider(
+        api_key="secret",
+        model_name="gemini-test",
+        timeout_seconds=12,
+    )
+
+    with caplog.at_level(logging.ERROR), pytest.raises(AIServiceUnavailableError):
+        provider.suggest({"catalog": []})
+
+    assert "400 INVALID_ARGUMENT" in caplog.text
+    assert "secret" not in caplog.text

@@ -44,7 +44,9 @@ def serialize_suggestion(
     *,
     cached: bool,
 ) -> dict:
-    draft = ProgramDraft.model_validate(suggestion.response)
+    draft = ProgramDraft.model_validate(
+        suggestion.applied_response or suggestion.response
+    )
     data = draft.model_dump(mode="json")
     data.update(
         suggestion_id=suggestion.id,
@@ -57,6 +59,39 @@ def serialize_suggestion(
         applied_at=suggestion.applied_at,
     )
     return data
+
+
+def get_pending_suggestion(db: Session, request_hash: str) -> ProgramSuggestion | None:
+    """Sugestão já aplicada não é reaproveitada: pedir de novo gera outra."""
+    return (
+        db.query(ProgramSuggestion)
+        .filter(
+            ProgramSuggestion.request_hash == request_hash,
+            ProgramSuggestion.applied_at.is_(None),
+        )
+        .first()
+    )
+
+
+@programs_router.get("", response_model=ProgramSuggestionResponse)
+def get_applied_program(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_event_or_404(db, event_id)
+    suggestion = (
+        db.query(ProgramSuggestion)
+        .filter(
+            ProgramSuggestion.event_id == event_id,
+            ProgramSuggestion.applied_at.is_not(None),
+        )
+        .order_by(ProgramSuggestion.applied_at.desc())
+        .first()
+    )
+    if suggestion is None:
+        raise HTTPException(status_code=404, detail="Program not found")
+    return serialize_suggestion(suggestion, cached=False)
 
 
 @programs_router.post(
@@ -86,11 +121,7 @@ def suggest_program(
         )
 
     request_hash = get_request_hash(context, provider.model_name)
-    cached = (
-        db.query(ProgramSuggestion)
-        .filter(ProgramSuggestion.request_hash == request_hash)
-        .first()
-    )
+    cached = get_pending_suggestion(db, request_hash)
     if cached is not None:
         return serialize_suggestion(cached, cached=True)
 
@@ -122,11 +153,7 @@ def suggest_program(
         db.commit()
     except IntegrityError:
         db.rollback()
-        cached = (
-            db.query(ProgramSuggestion)
-            .filter(ProgramSuggestion.request_hash == request_hash)
-            .first()
-        )
+        cached = get_pending_suggestion(db, request_hash)
         if cached is not None:
             return serialize_suggestion(cached, cached=True)
         raise

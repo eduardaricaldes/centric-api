@@ -293,7 +293,7 @@ def test_apply_invalido_preserva_playlist_existente(client, db_session, song_ids
         },
     ).json()
 
-    invalid = valid_draft(song_ids[1], duration=59).model_dump(mode="json")
+    invalid = valid_draft(song_ids[1], duration=30).model_dump(mode="json")
     response = client.post(
         f"/events/{event['id']}/program/apply",
         json={
@@ -351,3 +351,81 @@ def test_membro_nao_pode_sugerir_programa(client, db_session, song_ids):
     )
 
     assert response.status_code == 403, response.text
+
+
+def test_duracao_perto_do_alvo_passa_com_alerta(client, db_session, song_ids):
+    event = create_event(client, title="Culto tolerante", date="2026-11-29")
+    configure_provider(FakeProvider(valid_draft(song_ids[0], duration=57)))
+
+    response = client.post(
+        f"/events/{event['id']}/program/suggest",
+        json={"briefing": "Culto que soma quase o alvo", "duracao_alvo_min": 60},
+    )
+
+    assert response.status_code == 201, response.text
+    assert "A programação soma 57 min; o alvo era 60 min." in response.json()["alertas"]
+
+
+def test_duracao_longe_do_alvo_e_rejeitada(client, db_session, song_ids):
+    event = create_event(client, title="Culto curto", date="2026-11-30")
+    configure_provider(FakeProvider(valid_draft(song_ids[0], duration=50)))
+
+    response = client.post(
+        f"/events/{event['id']}/program/suggest",
+        json={"briefing": "Culto que fica longe do alvo", "duracao_alvo_min": 60},
+    )
+
+    assert response.status_code == 502
+
+
+def test_pedir_de_novo_depois_de_aplicar_gera_outra_sugestao(client, db_session, song_ids):
+    event = create_event(client, title="Culto refeito", date="2026-12-06")
+    provider = FakeProvider(valid_draft(song_ids[0]))
+    configure_provider(provider)
+    body = {"briefing": "Culto que será refeito", "duracao_alvo_min": 60}
+
+    first = client.post(f"/events/{event['id']}/program/suggest", json=body).json()
+    client.post(
+        f"/events/{event['id']}/program/apply",
+        json={"suggestion_id": first["suggestion_id"]},
+    )
+    second = client.post(f"/events/{event['id']}/program/suggest", json=body)
+
+    assert second.status_code == 201, second.text
+    assert second.json()["cached"] is False
+    assert second.json()["suggestion_id"] != first["suggestion_id"]
+    assert len(provider.contexts) == 2
+
+    applied = client.post(
+        f"/events/{event['id']}/program/apply",
+        json={"suggestion_id": second.json()["suggestion_id"]},
+    )
+    assert applied.status_code == 200, applied.text
+
+
+def test_programacao_aplicada_pode_ser_lida_por_membro(client, db_session, song_ids):
+    event = create_event(client, title="Culto lido", date="2026-12-13")
+    configure_provider(FakeProvider(valid_draft(song_ids[0])))
+
+    assert client.get(f"/events/{event['id']}/program").status_code == 404
+
+    suggestion = client.post(
+        f"/events/{event['id']}/program/suggest",
+        json={"briefing": "Culto com pregação", "duracao_alvo_min": 60},
+    ).json()
+    client.post(
+        f"/events/{event['id']}/program/apply",
+        json={"suggestion_id": suggestion["suggestion_id"]},
+    )
+
+    member = create_user(db_session, "leitor@north.com")
+    app.dependency_overrides[get_current_user] = lambda: member
+    response = client.get(f"/events/{event['id']}/program")
+
+    assert response.status_code == 200, response.text
+    assert [block["tipo"] for block in response.json()["blocos"]] == ["MUSICA", "PREGACAO"]
+    assert response.json()["applied_at"] is not None
+
+
+def test_programacao_de_evento_inexistente_da_404(client):
+    assert client.get("/events/999/program").status_code == 404

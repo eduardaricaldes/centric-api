@@ -18,6 +18,11 @@ class ProgramValidationError(ValueError):
     pass
 
 
+def get_duration_tolerance(target_minutes: int) -> int:
+    """A IA erra a soma com frequência; quem decide é o líder, que vê o alerta."""
+    return max(5, round(target_minutes * 0.15))
+
+
 def get_recently_used_song_ids(db: Session, event: Event) -> set[int]:
     """Returns IDs of songs used in the RECENT_HISTORY_DAYS before this event's date."""
     history_start = event.date - timedelta(days=RECENT_HISTORY_DAYS)
@@ -136,13 +141,18 @@ def validate_and_enrich_program(draft: ProgramDraft, context: dict) -> ProgramDr
 
     total_duration = sum(block.duracao_min for block in draft.blocos)
     target_duration = context["target_duration_minutes"]
-    if total_duration != target_duration:
+    if abs(total_duration - target_duration) > get_duration_tolerance(target_duration):
         raise ProgramValidationError(
             f"Program duration is {total_duration}, expected {target_duration}"
         )
 
     enriched = draft.model_copy(deep=True)
     existing_alerts = set(enriched.alertas)
+    if total_duration != target_duration:
+        alert = f"A programação soma {total_duration} min; o alvo era {target_duration} min."
+        if alert not in existing_alerts:
+            enriched.alertas.append(alert)
+            existing_alerts.add(alert)
     recent_by_song: dict[int, dict] = {}
     for usage in context["recent_song_history"]:
         recent_by_song.setdefault(usage["song_id"], usage)
