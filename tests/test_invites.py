@@ -365,3 +365,91 @@ def test_admin_pode_convidar_lider_de_ministerio(client, db_session):
 
     assert response.status_code == 201
     assert response.json()["ministry_role"] == "LEADER"
+
+
+def test_convite_de_lider_sem_ministerio_da_422(client):
+    response = client.post("/invites/", json={"role": "LEADER"})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "A LEADER invite requires a ministry"
+
+
+def test_convite_de_lider_lidera_o_ministerio_do_convite(client, db_session):
+    ministry = Ministry(name="Pregação")
+    db_session.add(ministry)
+    db_session.commit()
+
+    response = client.post(
+        "/invites/",
+        json={"role": "LEADER", "ministry_id": ministry.id, "ministry_role": "MEMBER"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["ministry_role"] == "LEADER"
+
+
+def test_lider_no_ministerio_vira_lider_no_papel_global(client, db_session):
+    ministry = Ministry(name="Recepção")
+    db_session.add(ministry)
+    db_session.commit()
+
+    response = client.post(
+        "/invites/",
+        json={"role": "MEMBER", "ministry_id": ministry.id, "ministry_role": "LEADER"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["role"] == "LEADER"
+
+
+def test_convite_antigo_de_lider_sem_ministerio_cadastra_como_membro(
+    client, db_session, current_user
+):
+    raw_invite(
+        db_session,
+        "lider-solto",
+        created_by=current_user.id,
+        role=UserRole.LEADER,
+    )
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "name": "Solto",
+            "email": "solto@north.com",
+            "password": "12345678",
+            "invite_token": "lider-solto",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["role"] == "MEMBER"
+
+
+def test_email_do_convite_nao_diferencia_maiusculas(client, db_session):
+    created = client.post(
+        "/invites/", json={"role": "MEMBER", "email": "Maria@North.com"}
+    )
+    assert created.status_code == 201
+    assert created.json()["email"] == "maria@north.com"
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "name": "Maria",
+            "email": "MARIA@north.com",
+            "password": "12345678",
+            "invite_token": created.json()["token"],
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["email"] == "maria@north.com"
+
+
+def test_convite_para_email_existente_nao_diferencia_maiusculas(client, db_session):
+    create_user(db_session, "ja-existe@north.com")
+
+    response = client.post("/invites/", json={"role": "MEMBER", "email": "JA-EXISTE@north.com"})
+
+    assert response.status_code == 409

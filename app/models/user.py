@@ -18,6 +18,8 @@ class User(Base):
         server_default=UserRole.MEMBER.value,
     )
     prefers_chords = Column(Boolean, nullable=False, server_default="false", default=False)
+    # Sobe a cada troca de senha e derruba os tokens emitidos antes dela.
+    token_version = Column(Integer, nullable=False, server_default="0", default=0)
 
     ministry_memberships = relationship(
         "MinistryMember",

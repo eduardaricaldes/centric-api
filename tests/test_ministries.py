@@ -28,7 +28,7 @@ def test_admin_lista_ministerios(client, db_session):
     assert "Louvor" in names
     assert "Mídia" in names
     for item in body["items"]:
-        assert set(item.keys()) == {"id", "name"}
+        assert set(item.keys()) == {"id", "name", "description"}
 
 
 def test_lider_lista_ministerios(client, db_session):

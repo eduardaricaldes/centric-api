@@ -1,10 +1,15 @@
-from pydantic import BaseModel, EmailStr, Field
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel, EmailStr, Field
 
 from app.models.roles import UserRole
 
+NormalizedEmail = Annotated[EmailStr, AfterValidator(str.lower)]
+
+
 class UserCreate(BaseModel):
-    name: str
-    email: EmailStr
+    name: str = Field(..., min_length=1)
+    email: NormalizedEmail
     password: str = Field(..., min_length=8)
     prefers_chords: bool = False
     invite_token: str | None = None
@@ -31,7 +36,7 @@ class UserSummary(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1)
     prefers_chords: bool | None = None
 
 

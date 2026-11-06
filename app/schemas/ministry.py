@@ -6,6 +6,7 @@ from app.models.roles import MinistryRole
 class MinistryItem(BaseModel):
     id: int
     name: str
+    description: str | None = None
 
     model_config = {"from_attributes": True}
 

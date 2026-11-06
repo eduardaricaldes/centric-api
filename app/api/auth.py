@@ -19,6 +19,22 @@ from app.services.memberships import sync_global_role
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+
+def issue_token(user: User) -> dict:
+    access_token = create_access_token(
+        data={
+            "sub": user.email,
+            "role": user.role.value,
+            "ver": user.token_version,
+        }
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role.value,
+    }
+
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
@@ -44,7 +60,7 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invite expired",
         )
-    if invite.email is not None and invite.email != payload.email:
+    if invite.email is not None and invite.email.lower() != payload.email:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invite does not match this email",
@@ -77,7 +93,8 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
             )
         )
         db.flush()
-        sync_global_role(db, user)
+
+    sync_global_role(db, user)
 
     invite.used_at = utcnow()
     invite.used_by = user.id
@@ -99,13 +116,13 @@ def update_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    for key, value in payload.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(current_user, key, value)
     db.commit()
     db.refresh(current_user)
     return current_user
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/change-password", response_model=Token)
 def change_password(
     payload: ChangePasswordRequest,
     db: Session = Depends(get_db),
@@ -118,8 +135,9 @@ def change_password(
         )
 
     current_user.password_hash = hash_password(payload.new_password)
+    current_user.token_version += 1
     db.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return issue_token(current_user)
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -154,6 +172,7 @@ def reset_password(
         )
 
     user.password_hash = hash_password(payload.new_password)
+    user.token_version += 1
     invite.used_at = utcnow()
     invite.used_by = user.id
     db.commit()
@@ -174,14 +193,4 @@ def login(
             status_code = status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    access_token = create_access_token(
-    data={
-        "sub": user.email,
-        "role": user.role.value,
-    }
-)
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user.role.value,
-    }
+    return issue_token(user)

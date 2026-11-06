@@ -3,10 +3,11 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.models.roles import MinistryRole, UserRole
+from app.schemas.user import NormalizedEmail
 
 
 class InviteCreate(BaseModel):
-    email: str | None = None
+    email: NormalizedEmail | None = None
     role: UserRole = UserRole.MEMBER
     ministry_id: int | None = None
     ministry_role: MinistryRole = MinistryRole.MEMBER

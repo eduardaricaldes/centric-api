@@ -64,7 +64,8 @@ def test_troca_senha_com_senha_atual_correta(client, db_session):
         "/auth/change-password",
         json={"current_password": "senha-antiga", "new_password": "senha-nova"},
     )
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert response.json()["access_token"]
 
     db_session.refresh(user)
     assert verify_password("senha-nova", user.password_hash)
@@ -230,3 +231,57 @@ def test_membro_nao_gera_link_de_senha(client, db_session):
     app.dependency_overrides[get_current_user] = lambda: member
 
     assert client.post(f"/users/{other.id}/reset-password").status_code == 403
+
+
+def login_token(client, email: str, password: str) -> str:
+    response = client.post(
+        "/auth/login", data={"username": email, "password": password}
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["access_token"]
+
+
+def me_status(client, token: str) -> int:
+    return client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
+    ).status_code
+
+
+def test_trocar_senha_derruba_tokens_antigos_e_devolve_um_novo(
+    unauthenticated_client, db_session
+):
+    create_user_with_password(db_session, "sessao@north.com", "senha-antiga")
+    old_token = login_token(unauthenticated_client, "sessao@north.com", "senha-antiga")
+    assert me_status(unauthenticated_client, old_token) == 200
+
+    response = unauthenticated_client.post(
+        "/auth/change-password",
+        headers={"Authorization": f"Bearer {old_token}"},
+        json={"current_password": "senha-antiga", "new_password": "senha-nova"},
+    )
+
+    assert response.status_code == 200
+    assert me_status(unauthenticated_client, old_token) == 401
+    assert me_status(unauthenticated_client, response.json()["access_token"]) == 200
+
+
+def test_redefinir_senha_derruba_tokens_antigos(client, db_session):
+    user = create_user_with_password(db_session, "roubada@north.com", "senha-antiga")
+    old_token = login_token(client, "roubada@north.com", "senha-antiga")
+    reset_token = client.post(f"/users/{user.id}/reset-password").json()["token"]
+
+    response = client.post(
+        "/auth/reset-password",
+        json={"token": reset_token, "new_password": "senha-recuperada"},
+    )
+    assert response.status_code == 204
+
+    app.dependency_overrides.pop(get_current_user)
+    assert me_status(client, old_token) == 401
+    assert me_status(client, login_token(client, "roubada@north.com", "senha-recuperada")) == 200
+
+
+def test_login_nao_diferencia_maiusculas_no_email(unauthenticated_client, db_session):
+    create_user_with_password(db_session, "ana@north.com", "senha-da-ana")
+
+    assert login_token(unauthenticated_client, "ANA@North.com", "senha-da-ana")

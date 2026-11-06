@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.password import PasswordResetTokenResponse
 from app.schemas.user import UserListResponse, UserResponse, UserRoleUpdate
 from app.services.invites import PASSWORD_RESET_TTL, generate_token, hash_token, utcnow
+from app.services.memberships import leads_any_ministry, sync_global_role
 from app.services.permissions import ensure_password_reset_allowed
 
 users_router = APIRouter(prefix="/users", tags=["Users"])
@@ -67,7 +68,15 @@ def update_user_role(
                 detail="Cannot remove the last admin",
             )
 
+    if payload.role == UserRole.LEADER and not leads_any_ministry(db, target):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not lead any ministry",
+        )
+
     target.role = payload.role
+    db.flush()
+    sync_global_role(db, target)
     db.commit()
     db.refresh(target)
     return target

@@ -39,7 +39,7 @@ def get_current_user(
 
     user = db.query(User).filter(User.email == email).first()
 
-    if user is None:
+    if user is None or payload.get("ver", 0) != user.token_version:
         raise credentials_exception
 
     return user

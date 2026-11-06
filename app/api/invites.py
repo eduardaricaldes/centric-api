@@ -12,6 +12,7 @@ from app.schemas.invite import (
     InviteCreateResponse,
     InviteListResponse,
 )
+from app.services.auth_services import get_user_by_email
 from app.services.invites import INVITE_TTL, generate_token, hash_token, utcnow
 from app.services.permissions import ensure_ministry_manager
 
@@ -74,8 +75,24 @@ def create_invite(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Ministry not found"
             )
 
+    if payload.role == UserRole.LEADER and payload.ministry_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A LEADER invite requires a ministry",
+        )
+
+    # Os dois campos dizem a mesma coisa: quem é líder global lidera o ministério
+    # do convite, e vice-versa. Divergir criaria um meio-líder no cadastro.
+    role = payload.role
+    ministry_role = payload.ministry_role
+    if payload.ministry_id is not None:
+        if role == UserRole.LEADER:
+            ministry_role = MinistryRole.LEADER
+        elif role == UserRole.MEMBER and ministry_role == MinistryRole.LEADER:
+            role = UserRole.LEADER
+
     if payload.email is not None:
-        if db.query(User).filter(User.email == payload.email).first() is not None:
+        if get_user_by_email(db, payload.email) is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email already has an account",
@@ -86,9 +103,9 @@ def create_invite(
         kind=InviteKind.INVITE,
         token_hash=hash_token(token),
         email=payload.email,
-        role=payload.role,
+        role=role,
         ministry_id=payload.ministry_id,
-        ministry_role=payload.ministry_role if payload.ministry_id is not None else None,
+        ministry_role=ministry_role if payload.ministry_id is not None else None,
         instrument=payload.instrument,
         created_by=current_user.id,
         expires_at=utcnow() + INVITE_TTL,

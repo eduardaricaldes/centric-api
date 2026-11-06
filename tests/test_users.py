@@ -1,6 +1,8 @@
 from app.core.dependencies import get_current_user, require_admin
 from app.main import app
-from app.models.roles import UserRole
+from app.models.ministry import Ministry
+from app.models.ministry_member import MinistryMember
+from app.models.roles import MinistryRole, UserRole
 from app.models.user import User
 
 
@@ -63,10 +65,39 @@ def test_membro_nao_lista_usuarios(client, db_session):
     assert response.status_code == 403
 
 
-def test_admin_muda_papel_global_de_usuario(client, db_session):
+def add_to_new_ministry(db_session, user: User, role: MinistryRole) -> None:
+    ministry = Ministry(name=f"Ministério de {user.email}")
+    db_session.add(ministry)
+    db_session.flush()
+    db_session.add(MinistryMember(ministry_id=ministry.id, user_id=user.id, role=role))
+    db_session.commit()
+
+
+def test_admin_promove_a_admin(client, db_session):
     user = create_user(db_session, "promover@north.com")
 
+    response = client.patch(f"/users/{user.id}/role", json={"role": "ADMIN"})
+    assert response.status_code == 200
+    assert response.json()["role"] == "ADMIN"
+
+
+def test_papel_de_lider_exige_liderar_um_ministerio(client, db_session):
+    user = create_user(db_session, "sem-ministerio@north.com")
+
     response = client.patch(f"/users/{user.id}/role", json={"role": "LEADER"})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "User does not lead any ministry"
+
+    db_session.refresh(user)
+    assert user.role == UserRole.MEMBER
+
+
+def test_admin_rebaixado_que_lidera_ministerio_volta_a_lider(client, db_session):
+    other_admin = create_user(db_session, "admin-lider@north.com", role=UserRole.ADMIN)
+    add_to_new_ministry(db_session, other_admin, MinistryRole.LEADER)
+
+    response = client.patch(f"/users/{other_admin.id}/role", json={"role": "MEMBER"})
+
     assert response.status_code == 200
     assert response.json()["role"] == "LEADER"
 

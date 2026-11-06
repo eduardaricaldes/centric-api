@@ -1,10 +1,11 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import verify_password
 from app.models.user import User 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    return db.query(User).filter(User.email == email).first()
+    return db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
 
 def authenticate_user(db:Session, email:str, password:str) -> User|None:
     user = get_user_by_email(db,email)

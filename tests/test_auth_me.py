@@ -54,3 +54,13 @@ def test_usuario_pode_se_registrar_como_musico(client):
     assert response.status_code == 201
     assert response.json()["prefers_chords"] is True
     assert response.json()["role"] == "MEMBER"
+
+
+def test_patch_me_ignora_campo_nulo(client, current_user):
+    name = current_user.name
+
+    response = client.patch("/auth/me", json={"name": None, "prefers_chords": True})
+
+    assert response.status_code == 200
+    assert response.json()["name"] == name
+    assert response.json()["prefers_chords"] is True
