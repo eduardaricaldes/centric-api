@@ -1,3 +1,4 @@
+import getpass
 import os
 import sys
 
@@ -10,12 +11,15 @@ from app.core.security import hash_password
 from app.models.roles import UserRole
 from app.models.user import User
 
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
-ADMIN_NAME = os.environ.get("ADMIN_NAME")
+ADMIN_EMAIL = (os.environ.get("ADMIN_EMAIL") or input("E-mail do admin: ")).strip().lower()
+ADMIN_NAME = os.environ.get("ADMIN_NAME") or input("Nome do admin: ").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or getpass.getpass("Senha do admin: ")
 
 if not all([ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME]):
-    print("Error: ADMIN_EMAIL, ADMIN_PASSWORD and ADMIN_NAME must be set.")
+    print("Error: e-mail, nome e senha são obrigatórios.")
+    sys.exit(1)
+if len(ADMIN_PASSWORD) < 8:
+    print("Error: a senha precisa ter pelo menos 8 caracteres.")
     sys.exit(1)
 
 with Session(engine) as db:

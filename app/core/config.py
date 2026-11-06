@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +12,19 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: int = 30
     rate_limit_enabled: bool = True
+    # Só ligue atrás de um proxy que sobrescreve o X-Forwarded-For (a Vercel faz isso).
+    trust_proxy_headers: bool = False
+    sql_echo: bool = False
+    # Em serverless cada instância é efêmera: quem faz o pool é o banco.
+    db_null_pool: bool = False
+
+    @field_validator("database_url")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        """Provedores entregam postgres://, que o SQLAlchemy não aceita."""
+        if value.startswith("postgres://"):
+            return "postgresql://" + value.removeprefix("postgres://")
+        return value
 
     @property
     def cors_origins_list(self) -> list[str]:

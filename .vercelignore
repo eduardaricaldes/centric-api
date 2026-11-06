@@ -1,0 +1,15 @@
+.claude
+.github
+docs
+migrations
+scripts
+tests
+.env
+.env.*
+*.pyc
+__pycache__
+alembic.ini
+docker-compose.yml
+Makefile
+pytest.ini
+requirements-dev.txt
