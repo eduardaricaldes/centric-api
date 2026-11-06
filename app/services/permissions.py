@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.event import Event
@@ -25,6 +26,39 @@ def ensure_ministry_manager(db: Session, user: User, ministry_id: int) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Ministry leader access required",
+        )
+
+
+def ensure_password_reset_allowed(db: Session, user: User, target: User) -> None:
+    """ADMIN redefine a senha de qualquer um; LEADER, só de MEMBER do ministério que lidera.
+
+    O link de redefinição dá acesso à conta do alvo, então quem gera nunca pode
+    alcançar uma conta com mais poder que a sua.
+    """
+    if user.role == UserRole.ADMIN:
+        return
+
+    led_ministries = (
+        db.query(MinistryMember.ministry_id)
+        .filter(
+            MinistryMember.user_id == user.id,
+            MinistryMember.role == MinistryRole.LEADER,
+        )
+        .subquery()
+    )
+    shares_ministry = (
+        db.query(MinistryMember)
+        .filter(
+            MinistryMember.user_id == target.id,
+            MinistryMember.ministry_id.in_(select(led_ministries)),
+        )
+        .first()
+        is not None
+    )
+    if user.role != UserRole.LEADER or target.role != UserRole.MEMBER or not shares_ministry:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
         )
 
 

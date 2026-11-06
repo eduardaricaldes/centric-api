@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.invite import Invite, InviteKind
 from app.models.ministry import Ministry
-from app.models.roles import UserRole
+from app.models.roles import MinistryRole, UserRole
 from app.models.user import User
 from app.schemas.invite import (
     InviteCreate,
@@ -55,6 +55,11 @@ def create_invite(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Leaders can only invite MEMBER",
+            )
+        if payload.ministry_role != MinistryRole.MEMBER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only ADMIN can set a member as LEADER",
             )
         if payload.ministry_id is None:
             raise HTTPException(

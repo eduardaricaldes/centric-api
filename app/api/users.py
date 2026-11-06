@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.password import PasswordResetTokenResponse
 from app.schemas.user import UserListResponse, UserResponse, UserRoleUpdate
 from app.services.invites import PASSWORD_RESET_TTL, generate_token, hash_token, utcnow
+from app.services.permissions import ensure_password_reset_allowed
 
 users_router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -85,6 +86,8 @@ def create_password_reset(
     target = db.query(User).filter(User.id == user_id).first()
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    ensure_password_reset_allowed(db, current_user, target)
 
     token = generate_token()
     invite = Invite(

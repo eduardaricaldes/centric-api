@@ -336,6 +336,8 @@ no banco:
 - **Senha esquecida.** Sem serviço de e-mail, o caminho é o mesmo do convite: o admin ou o líder
   gera um link de redefinição e manda no WhatsApp. Mesma mecânica (token com validade e uso único),
   então cabe na mesma tabela, com um campo dizendo se o token é convite ou redefinição.
+  O admin gera para qualquer pessoa; o líder, só para `MEMBER` do ministério que lidera. O link dá
+  acesso à conta, então ninguém pode gerá-lo para uma conta com mais poder que a sua.
 - **Tamanho mínimo de senha.** Hoje `password` é uma string sem validação nenhuma.
 
 Junto disso vai o **rate limit no login**, que já estava na seção de segurança e nunca foi feito.

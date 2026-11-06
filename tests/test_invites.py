@@ -326,3 +326,42 @@ def test_convite_com_email_so_vale_para_aquele_email(client, db_session, current
         },
     )
     assert response.status_code == 403
+
+
+def test_lider_nao_pode_convidar_co_lider_pelo_papel_no_ministerio(client, db_session):
+    ministry = Ministry(name="Louvor")
+    db_session.add(ministry)
+    db_session.commit()
+    leader = make_leader(db_session, "lider-co@north.com", ministry)
+    app.dependency_overrides[get_current_user] = lambda: leader
+
+    response = client.post(
+        "/invites/",
+        json={
+            "role": "MEMBER",
+            "ministry_id": ministry.id,
+            "ministry_role": "LEADER",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Only ADMIN can set a member as LEADER"
+    assert db_session.query(Invite).count() == 0
+
+
+def test_admin_pode_convidar_lider_de_ministerio(client, db_session):
+    ministry = Ministry(name="Mídia")
+    db_session.add(ministry)
+    db_session.commit()
+
+    response = client.post(
+        "/invites/",
+        json={
+            "role": "MEMBER",
+            "ministry_id": ministry.id,
+            "ministry_role": "LEADER",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["ministry_role"] == "LEADER"
