@@ -9,9 +9,14 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.dependencies import get_current_user, require_admin
+from app.core.rate_limit import limiter
 from app.main import app
 from app.models.roles import UserRole
 from app.models.user import User
+
+# Rate limit no login/registro/reset atrapalha os testes rodando em sequência.
+settings.rate_limit_enabled = False
+limiter.enabled = False
 
 ADMIN_EMAIL = "admin@comunidadenorth.com"
 

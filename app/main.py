@@ -1,19 +1,29 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 
 from app.api.songs import songs_router
 from app.api.assignments import assignments_router
 from app.api.events import events_router
+from app.api.invites import invites_router
 from app.api.ministries import ministries_router
 from app.api.programs import programs_router
+from app.api.users import users_router
 from app.core.config import settings
 from app.core.database import engine
+from app.core.rate_limit import limiter
 from app.api.auth import router as auth_router
 from app.api.playlists import playlist_router
 from app.api.playlist_songs import playlist_songs_router
 
 app = FastAPI(title="Centric API")
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,3 +54,5 @@ app.include_router(events_router)
 app.include_router(assignments_router)
 app.include_router(ministries_router)
 app.include_router(programs_router)
+app.include_router(users_router)
+app.include_router(invites_router)

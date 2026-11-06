@@ -1,7 +1,7 @@
 # Centric — Próximos passos
 
 Documento de planejamento da API do Centric (Comunidade North).
-Última atualização: 19/09/2026 (fase 1 concluída).
+Última atualização: 19/09/2026 (fases 1 a 5 concluídas).
 
 ---
 
@@ -53,14 +53,12 @@ só, e o front nunca precisa "adivinhar" a qual playlist um item pertence.
 
 ### O que ainda incomoda
 
-A dívida técnica antiga (letra opcional no banco, título sem tamanho, schemas sem uso, CORS) foi toda
-resolvida na fase 1. Sobraram três coisas que o front vai sentir no primeiro dia:
+Na API, nada. As três coisas que estavam anotadas aqui — token de 30 minutos, falta do
+`GET /auth/me` e busca vazia devolvendo 404 — foram resolvidas na fase 2, e a dívida técnica antiga
+saiu na fase 1.
 
-- O token dura 30 minutos e não tem refresh. Um culto dura mais que isso, então a sessão cai no meio.
-- Não existe `GET /auth/me`. Depois do login o front recebe só o token e o papel, e não sabe o nome de
-  quem entrou.
-- Busca sem resultado devolve 404 em vez de lista vazia. 404 é para recurso que não existe, não para
-  busca que não achou nada.
+O que incomoda agora é que **a API está pronta e ninguém da igreja consegue usar**, porque não existe
+tela. O próximo passo é o front-end, com os requisitos que já estão escritos no documento separado.
 
 ---
 
@@ -82,7 +80,7 @@ Antes de crescer, deixar a base sólida:
 
 ---
 
-## 3. Fase 2 — API pronta para o front
+## 3. Fase 2 — API pronta para o front (concluída)
 
 Um bloco pequeno de API feito **antes** do front começar. São mudanças baratas agora e caras depois,
 porque mexem justamente no que toda tela usa. Uma semana.
@@ -121,7 +119,7 @@ API. Feitas agora, o front constrói a tela uma vez. Feitas depois, ele reconstr
 
 ---
 
-## 4. Fase 3 — RBAC de verdade
+## 4. Fase 3 — RBAC de verdade (concluída)
 
 Hoje o controle é `role == "ADMIN"` numa string. Funciona para duas pessoas, quebra quando a
 igreja tiver líder de louvor, líder de pregação, equipe de mídia e recepção.
@@ -173,7 +171,7 @@ Passos: enum de papéis → tabelas `ministries` e `ministry_members` → migrat
 
 ---
 
-## 5. Fase 4 — Escalas (músicos e pregadores)
+## 5. Fase 4 — Escalas (músicos e pregadores) (concluída)
 
 Aqui o Centric deixa de ser um repositório de letras e vira a ferramenta de organização do culto.
 
@@ -226,7 +224,7 @@ GET    /events/{id}/preaching
 
 ---
 
-## 6. Fase 5 — IA (Gemini) montando o escopo da programação
+## 6. Fase 5 — IA (Gemini) montando o escopo da programação (concluída)
 
 ### Fluxo
 
@@ -283,7 +281,76 @@ garantia de que o conteúdo não é usado para treinar os modelos do Google.
 
 ---
 
-## 7. Depois — n8n + WhatsApp (fora das fases)
+## 7. Fase 6 — Administração pela tela
+
+O RBAC da fase 3 funciona, mas hoje é decorativo: `/ministries` tem **duas rotas, as duas de
+leitura**. Não existe jeito de criar um ministério, pôr gente dentro, dizer quem lidera ou promover
+alguém. Para a North sair do zero, alguém precisa rodar SQL na mão — os próprios testes criam
+ministério com `Ministry(name="Louvor")` direto no banco, o que funciona no teste e não na vida.
+
+**A meta da fase:** depois dela, o único comando fora da tela é o `make seed-admin`, que cria o
+primeiro admin e roda uma vez na vida do sistema. Todo o resto é pela aplicação.
+
+### Entrada por convite, não por fila de aprovação
+
+Hoje qualquer pessoa com o endereço do site se cadastra e vê o repertório e a escala inteira. O
+cadastro aberto acaba: quem entra, entra por um convite criado por um admin ou por um líder.
+
+O convite carrega o papel e o ministério **dentro dele**. A pessoa abre o link, escolhe a própria
+senha e já entra funcionando — sem ninguém aprovando nada depois.
+
+A fila de aprovação foi descartada de propósito. Ela existe para quando você não sabe quem está
+batendo na porta, que é o caso de um fórum público e não o de uma igreja. E resolve só metade:
+depois de aprovar o cadastro, ainda falta promover a pessoa e ligá-la ao ministério.
+
+Sem serviço de e-mail: o admin copia o link e manda no WhatsApp.
+
+### Promover é um ato só
+
+Para alguém ser líder, duas coisas precisam ser verdade em dois lugares: `users.role = LEADER` e um
+`MinistryMember` com `role = LEADER`. Se a tela permitir escrever uma sem a outra, nasce o
+**meio-líder**: quem tem o papel global e nenhum ministério não consegue nada, e quem lidera o
+ministério mas ficou como `MEMBER` também não.
+
+A regra: **uma rota só escreve os dois lados, na mesma transação**. E o contrário também — quem
+deixa de liderar o último ministério volta a ser `MEMBER` sozinho.
+
+Dívida anotada: o certo seria apagar `LEADER` do papel global e derivar "é líder" da participação no
+ministério, uma fonte de verdade só. Reescreve a camada de permissão inteira, então fica para depois.
+
+### Quem pode convidar quem
+
+| Quem convida | Pode criar convite para |
+|---|---|
+| `ADMIN` | qualquer papel, qualquer ministério |
+| `LEADER` | `MEMBER`, e só para o ministério que ele lidera |
+
+Promover a líder continua sendo decisão de admin.
+
+### Senha e acesso
+
+Faltam três coisas que, sem elas, a promessa da fase não se cumpre — em todas, a saída hoje é SQL
+no banco:
+
+- **Trocar a própria senha.** Não existe rota.
+- **Senha esquecida.** Sem serviço de e-mail, o caminho é o mesmo do convite: o admin ou o líder
+  gera um link de redefinição e manda no WhatsApp. Mesma mecânica (token com validade e uso único),
+  então cabe na mesma tabela, com um campo dizendo se o token é convite ou redefinição.
+- **Tamanho mínimo de senha.** Hoje `password` é uma string sem validação nenhuma.
+
+Junto disso vai o **rate limit no login**, que já estava na seção de segurança e nunca foi feito.
+Antes de o endereço ficar público, login sem limite é convite para força bruta.
+
+### O que esta fase não muda
+
+- **Cadastro de música continua só do admin** — decisão da equipe.
+- **Membro continua vendo tudo**: escala, repertório e letras. O que protege é a porta de entrada.
+- **Apagar ministério fica de fora**: ministério que já apareceu em escala não some sem levar
+  histórico junto. Renomear resolve o caso real.
+
+---
+
+## 8. Depois — n8n + WhatsApp (fora das fases)
 
 > **Fora das fases, de propósito.** É a única parte do projeto com custo recorrente e a única que
 > depende de gente de fora da equipe técnica: número da igreja, template aprovado pela Meta, telefone
@@ -352,35 +419,40 @@ do n8n não muda, só o nó final.
 
 ---
 
-## 8. Segurança e operação
+## 9. Segurança e operação
 
 - **LGPD**: telefone é dado pessoal. Coletar só de quem participa das escalas, com consentimento
   registrado, e permitir sair do envio.
 - **Secrets** (`SECRET_KEY`, `GEMINI_API_KEY`, token do WhatsApp) nunca no repositório. O `.env`
-  já está no `.gitignore` — confirmar que ele nunca foi commitado (`git log -- .env`).
+  já está no `.gitignore` e nunca foi commitado (conferido: `git log -- .env` não retorna nada).
 - **Backup do Postgres**: dump diário. A letra certa da música é o ativo do sistema.
-- **Rate limit** no `/auth/login`.
-- Token JWT expira em 30 minutos e não há refresh token — a equipe vai reclamar de "caiu de novo"
-  no domingo. Aumentar o tempo ou implementar refresh antes de ir para produção.
+- **Rate limit** no `/auth/login` — entra na fase 6.
+- Token JWT: resolvido na fase 2, expira em 8 horas. Refresh token continua não existindo, e por
+  enquanto não faz falta.
 
 ---
 
-## 9. Ordem sugerida
+## 10. Ordem sugerida
 
-| Fase | Entrega | Esforço |
+| Fase | Entrega | Situação |
 |---|---|---|
 | 1 | CORS, primeiro admin, CI e testes em banco separado | Feita |
-| 2 | Cifras, `/auth/me`, token mais longo, busca vazia | 1 semana |
-| 3 | RBAC com ministérios | 1 semana |
-| 4 | Eventos, escalas e pregadores | 2 a 3 semanas |
-| 5 | Sugestão de programação com o Gemini | 1 semana |
+| 2 | Cifras, `/auth/me`, token mais longo, busca vazia | Feita |
+| 3 | RBAC com ministérios | Feita |
+| 4 | Eventos, escalas e pregadores | Feita |
+| 5 | Sugestão de programação com o Gemini | Feita |
+| 6 | Administração pela tela: convites, ministérios e papéis | 1 semana |
 
-A fase 5 depende da 4: a IA precisa saber quem está escalado para montar a programação. O n8n e o
-WhatsApp ficam fora dessa conta, para serem retomados quando o sistema estiver em uso.
+A fase 6 é a última do back-end, e destrava o resto: sem criar ministério e sem promover líder pela
+tela, o RBAC das fases 3 e 4 só funciona com SQL na mão. O n8n e o WhatsApp continuam fora da conta.
 
-O front começa assim que a fase 2 fechar, e não precisa esperar o RBAC — desde que a checagem de
-papel fique isolada numa função só (`podeEditar(usuario)`), trocar `ADMIN x USER` por papéis e
-ministérios depois é mudança de um arquivo.
+Ela também muda o front antes de ele começar: a tela "Criar conta" vira "Criar conta pelo convite",
+e entra uma tela de administração. Como o front ainda não existe, isso é de graça agora e seria
+retrabalho depois.
+
+No front, a checagem de papel deve ficar isolada numa função só (`podeEditar(usuario)`): os papéis
+hoje são `ADMIN`, `LEADER` e `MEMBER`, e a regra de quem monta repertório é "qualquer líder", não
+"o dono do evento".
 
 ---
 

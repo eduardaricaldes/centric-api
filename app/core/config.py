@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: int = 30
+    rate_limit_enabled: bool = True
 
     @property
     def cors_origins_list(self) -> list[str]:

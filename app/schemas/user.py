@@ -1,12 +1,13 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.roles import UserRole
 
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8)
     prefers_chords: bool = False
+    invite_token: str | None = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -30,7 +31,19 @@ class UserSummary(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    prefers_chords: bool
+    name: str | None = None
+    prefers_chords: bool | None = None
+
+
+class UserListResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    items: list[UserResponse]
+
+
+class UserRoleUpdate(BaseModel):
+    role: UserRole
 
 class Token(BaseModel):
     access_token: str

@@ -14,6 +14,11 @@ class MinistryRole(StrEnum):
     MEMBER = "MEMBER"
 
 
+class InviteKind(StrEnum):
+    INVITE = "INVITE"
+    PASSWORD_RESET = "PASSWORD_RESET"
+
+
 user_role_type = SQLAlchemyEnum(
     UserRole,
     name="user_role",
@@ -30,4 +35,13 @@ ministry_role_type = SQLAlchemyEnum(
     create_constraint=True,
     validate_strings=True,
     length=6,
+)
+
+invite_kind_type = SQLAlchemyEnum(
+    InviteKind,
+    name="invite_kind",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+    length=20,
 )

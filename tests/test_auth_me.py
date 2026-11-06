@@ -25,7 +25,21 @@ def test_usuario_pode_alterar_o_proprio_perfil_de_musico(client):
     assert client.get("/auth/me").json()["prefers_chords"] is True
 
 
+def test_usuario_pode_alterar_o_proprio_nome(client):
+    response = client.patch("/auth/me", json={"name": "Novo Nome"})
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Novo Nome"
+    assert client.get("/auth/me").json()["name"] == "Novo Nome"
+
+
 def test_usuario_pode_se_registrar_como_musico(client):
+    invite = client.post(
+        "/invites/",
+        json={"email": "musicista@example.com", "role": "MEMBER"},
+    )
+    token = invite.json()["token"]
+
     response = client.post(
         "/auth/register",
         json={
@@ -33,6 +47,7 @@ def test_usuario_pode_se_registrar_como_musico(client):
             "email": "musicista@example.com",
             "password": "senha-segura",
             "prefers_chords": True,
+            "invite_token": token,
         },
     )
 
