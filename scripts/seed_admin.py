@@ -4,6 +4,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from email_validator import EmailNotValidError, validate_email
 from sqlalchemy.orm import Session
 
 from app.core.database import engine
@@ -17,6 +18,12 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or getpass.getpass("Senha do a
 
 if not all([ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME]):
     print("Error: e-mail, nome e senha são obrigatórios.")
+    sys.exit(1)
+try:
+    # A API valida o e-mail ao responder: um inválido aqui trancaria o admin para fora.
+    validate_email(ADMIN_EMAIL, check_deliverability=False)
+except EmailNotValidError as exc:
+    print(f"Error: e-mail inválido: {exc}")
     sys.exit(1)
 if len(ADMIN_PASSWORD) < 8:
     print("Error: a senha precisa ter pelo menos 8 caracteres.")
