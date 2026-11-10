@@ -11,6 +11,7 @@ from app.api.events import events_router
 from app.api.invites import invites_router
 from app.api.ministries import ministries_router
 from app.api.programs import programs_router
+from app.api.share_links import public_router, share_links_router
 from app.api.users import users_router
 from app.core.config import settings
 from app.core.database import engine
@@ -56,3 +57,5 @@ app.include_router(ministries_router)
 app.include_router(programs_router)
 app.include_router(users_router)
 app.include_router(invites_router)
+app.include_router(share_links_router)
+app.include_router(public_router)

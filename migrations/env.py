@@ -18,6 +18,7 @@ from app.models.assignment import Assignment  # noqa: F401
 from app.models.preaching import Preaching  # noqa: F401
 from app.models.program_suggestion import ProgramSuggestion  # noqa: F401
 from app.models.invite import Invite  # noqa: F401
+from app.models.share_link import ShareLink  # noqa: F401
 
 
 # this is the Alembic Config object, which provides
