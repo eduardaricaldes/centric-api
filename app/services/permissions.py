@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.assignment import Assignment
 from app.models.event import Event
 from app.models.ministry_member import MinistryMember
 from app.models.playlist import Playlist
@@ -99,4 +100,48 @@ def ensure_playlist_manager(db: Session, user: User, playlist: Playlist) -> None
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Playlist manager access required",
+    )
+
+
+def ensure_share_link_manager(
+    db: Session,
+    user: User,
+    *,
+    event: Event | None = None,
+) -> None:
+    """ADMIN compartilha qualquer coisa; LEADER, só eventos dos ministérios que lidera.
+
+    O evento é "do ministério" quando foi criado pelo líder ou quando alguém de
+    um ministério que ele lidera está escalado nele. Música avulsa é só do ADMIN.
+    """
+    if user.role == UserRole.ADMIN:
+        return
+
+    if user.role == UserRole.LEADER and event is not None:
+        if event.created_by == user.id:
+            return
+
+        led_ministries = (
+            db.query(MinistryMember.ministry_id)
+            .filter(
+                MinistryMember.user_id == user.id,
+                MinistryMember.role == MinistryRole.LEADER,
+            )
+            .subquery()
+        )
+        serves_led_ministry = (
+            db.query(Assignment.id)
+            .filter(
+                Assignment.event_id == event.id,
+                Assignment.ministry_id.in_(select(led_ministries)),
+            )
+            .first()
+            is not None
+        )
+        if serves_led_ministry:
+            return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Share link manager access required",
     )
