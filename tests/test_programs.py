@@ -568,3 +568,26 @@ def test_edicao_do_lider_mantem_duracao_diferente_do_catalogo(client, db_session
     assert response.status_code == 200, response.text
     saved = db_session.get(ProgramSuggestion, suggestion["suggestion_id"])
     assert saved.applied_response["blocos"][0]["duracao_min"] == 10
+
+
+class FallbackProvider(FakeProvider):
+    """Simula o principal sem cota e o reserva respondendo."""
+
+    model_name = "gemini:gemini-flash"
+
+    def suggest(self, context: dict) -> ProgramDraft:
+        self.last_model_name = "groq:openai/gpt-oss-120b"
+        return super().suggest(context)
+
+
+def test_provider_model_salvo_e_o_modelo_que_respondeu(client, db_session, song_ids):
+    event = create_event(client, title="Culto com reserva", date="2027-01-03")
+    configure_provider(FallbackProvider(valid_draft(song_ids[0])))
+    body = {"briefing": "Culto com o modelo principal sem cota", "duracao_alvo_min": 60}
+
+    response = client.post(f"/events/{event['id']}/program/suggest", json=body)
+
+    assert response.status_code == 201, response.text
+    assert response.json()["provider_model"] == "groq:openai/gpt-oss-120b"
+    saved = db_session.get(ProgramSuggestion, response.json()["suggestion_id"])
+    assert saved.provider_model == "groq:openai/gpt-oss-120b"

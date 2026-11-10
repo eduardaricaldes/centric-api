@@ -147,7 +147,8 @@ def suggest_program(
         duration_minutes=payload.duracao_alvo_min,
         response=draft.model_dump(mode="json"),
         request_hash=request_hash,
-        provider_model=provider.model_name,
+        # Se o reserva respondeu, é ele que fica registrado.
+        provider_model=getattr(provider, "last_model_name", None) or provider.model_name,
         requested_by=current_user.id,
     )
     db.add(suggestion)
