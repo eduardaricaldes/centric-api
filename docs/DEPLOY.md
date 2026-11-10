@@ -9,6 +9,7 @@ API e front ficam em dois projetos da Vercel, e o banco é um Postgres gerenciad
 | `DATABASE_URL` | URL do Postgres, de preferência a do pooler |
 | `SECRET_KEY` | `openssl rand -hex 32`. Trocar derruba todas as sessões |
 | `CORS_ORIGINS` | URL pública do front |
+| `AI_PROVIDER` | `gemini` (padrão); um nome desconhecido deixa a IA em 503 e registra o erro no log |
 | `GEMINI_API_KEY` | chave da Gemini; sem ela a tela continua no modo manual |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` |
 | `TRUST_PROXY_HEADERS` | `true`: a Vercel sobrescreve o `X-Forwarded-For` |

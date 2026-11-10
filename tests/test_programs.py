@@ -148,7 +148,16 @@ def test_sugestao_inclui_contexto_historico_alerta_e_cache(
     assert context["target_duration_minutes"] == 60
     assert context["assignments"][0]["function"] == "Vocal"
     assert context["recent_song_history"][0]["song_id"] == song_ids[0]
-    assert set(context["catalog"][0]) == {"id", "title", "tone", "category"}
+    assert set(context["catalog"][0]) == {
+        "id",
+        "title",
+        "tone",
+        "category",
+        "duration_min",
+    }
+    assert context["catalog"][0]["category"] == "Adoração"
+    assert context["recent_song_history"][0]["category"] == "Adoração"
+    assert context["requested_durations"] == []
     assert db_session.query(ProgramSuggestion).count() == 1
 
 
@@ -353,7 +362,7 @@ def test_membro_nao_pode_sugerir_programa(client, db_session, song_ids):
     assert response.status_code == 403, response.text
 
 
-def test_duracao_perto_do_alvo_passa_com_alerta(client, db_session, song_ids):
+def test_duracao_perto_do_alvo_e_completada_com_alerta(client, db_session, song_ids):
     event = create_event(client, title="Culto tolerante", date="2026-11-29")
     configure_provider(FakeProvider(valid_draft(song_ids[0], duration=57)))
 
@@ -363,7 +372,34 @@ def test_duracao_perto_do_alvo_passa_com_alerta(client, db_session, song_ids):
     )
 
     assert response.status_code == 201, response.text
-    assert "A programação soma 57 min; o alvo era 60 min." in response.json()["alertas"]
+    body = response.json()
+    assert [block["duracao_min"] for block in body["blocos"]] == [5, 55]
+    assert (
+        "A duração de “Mensagem” passou de 52 para 55 min para fechar o alvo de 60 min."
+        in body["alertas"]
+    )
+
+
+def test_edicao_do_lider_perto_do_alvo_passa_com_alerta(client, db_session, song_ids):
+    event = create_event(client, title="Culto editado", date="2026-11-29")
+    configure_provider(FakeProvider(valid_draft(song_ids[0])))
+    suggestion = client.post(
+        f"/events/{event['id']}/program/suggest",
+        json={"briefing": "Culto que o líder vai encurtar", "duracao_alvo_min": 60},
+    ).json()
+
+    response = client.post(
+        f"/events/{event['id']}/program/apply",
+        json={
+            "suggestion_id": suggestion["suggestion_id"],
+            "programacao": valid_draft(song_ids[0], duration=57).model_dump(mode="json"),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    saved = db_session.get(ProgramSuggestion, suggestion["suggestion_id"])
+    assert [block["duracao_min"] for block in saved.applied_response["blocos"]] == [5, 52]
+    assert "A programação soma 57 min; o alvo era 60 min." in saved.applied_response["alertas"]
 
 
 def test_duracao_longe_do_alvo_e_rejeitada(client, db_session, song_ids):
@@ -429,3 +465,106 @@ def test_programacao_aplicada_pode_ser_lida_por_membro(client, db_session, song_
 
 def test_programacao_de_evento_inexistente_da_404(client):
     assert client.get("/events/999/program").status_code == 404
+
+
+PRODUCTION_BRIEFING = (
+    "Culto de domingo à noite com tema gratidão. Abrir com celebração, ter um "
+    "momento de oração e uma pregação de 30 minutos."
+)
+
+
+def create_song(client, title: str, category: str, duration_min: int | None) -> int:
+    payload = {"title": title, "lyrics": f"letra de {title}", "category": category}
+    if duration_min is not None:
+        payload["duration_min"] = duration_min
+    response = client.post("/songs/", json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def production_like_draft(songs: list[int]) -> ProgramDraft:
+    """Como no teste em produção: tudo 5 min, pregação de 25 e sem acentos."""
+    return ProgramDraft(
+        resumo="Programacao de gratidao com celebracao e oracao",
+        blocos=[
+            ProgramBlock(ordem=1, tipo=ProgramBlockType.MUSIC, song_id=songs[0], duracao_min=5),
+            ProgramBlock(ordem=2, tipo=ProgramBlockType.MUSIC, song_id=songs[1], duracao_min=5),
+            ProgramBlock(
+                ordem=3,
+                tipo=ProgramBlockType.MOMENT,
+                titulo="Momento de Oracao",
+                duracao_min=15,
+            ),
+            ProgramBlock(ordem=4, tipo=ProgramBlockType.MUSIC, song_id=songs[2], duracao_min=5),
+            ProgramBlock(
+                ordem=5,
+                tipo=ProgramBlockType.PREACHING,
+                titulo="Pregacao: Gratidao",
+                duracao_min=25,
+            ),
+            ProgramBlock(ordem=6, tipo=ProgramBlockType.MUSIC, song_id=songs[3], duracao_min=5),
+        ],
+    )
+
+
+def test_sugestao_corrige_duracoes_e_acentos_do_teste_em_producao(client, db_session):
+    songs = [
+        create_song(client, "Celebrai", "Celebração", 6),
+        create_song(client, "Alegria", "Celebração", 4),
+        create_song(client, "Rendido", "Adoração", 5),
+        create_song(client, "Sem Duração", "Adoração", None),
+    ]
+    event = create_event(client, title="Culto de gratidão", date="2026-12-20")
+    provider = FakeProvider(production_like_draft(songs))
+    configure_provider(provider)
+
+    response = client.post(
+        f"/events/{event['id']}/program/suggest",
+        json={"briefing": PRODUCTION_BRIEFING, "duracao_alvo_min": 60},
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    durations = [block["duracao_min"] for block in body["blocos"]]
+    # Músicas com duração do catálogo (6 e 4), a sem duração fica com 5,
+    # pregação de 30 como pedido e a oração fecha o alvo.
+    assert durations == [6, 4, 10, 5, 30, 5]
+    assert sum(durations) == 60
+    assert body["resumo"] == "Programação de gratidão com celebração e oração"
+    assert body["blocos"][2]["titulo"] == "Momento de Oração"
+    assert body["blocos"][4]["titulo"] == "Pregação: Gratidão"
+    assert body["alertas"] == [
+        "A duração de “Momento de Oração” passou de 15 para 10 min para fechar "
+        "o alvo de 60 min."
+    ]
+
+    context = provider.contexts[0]
+    assert context["requested_durations"] == [
+        {"termo": "pregação", "tipo": "PREGACAO", "duracao_min": 30}
+    ]
+    catalog = {song["id"]: song for song in context["catalog"]}
+    assert catalog[songs[0]]["duration_min"] == 6
+    assert catalog[songs[0]]["category"] == "Celebração"
+    assert catalog[songs[3]]["duration_min"] is None
+
+
+def test_edicao_do_lider_mantem_duracao_diferente_do_catalogo(client, db_session):
+    song = create_song(client, "Versão Longa", "Celebração", 6)
+    event = create_event(client, title="Culto com versão longa", date="2026-12-27")
+    configure_provider(FakeProvider(valid_draft(song)))
+    suggestion = client.post(
+        f"/events/{event['id']}/program/suggest",
+        json={"briefing": "Culto com uma versão estendida", "duracao_alvo_min": 60},
+    ).json()
+    edited = valid_draft(song).model_dump(mode="json")
+    edited["blocos"][0]["duracao_min"] = 10
+    edited["blocos"][1]["duracao_min"] = 50
+
+    response = client.post(
+        f"/events/{event['id']}/program/apply",
+        json={"suggestion_id": suggestion["suggestion_id"], "programacao": edited},
+    )
+
+    assert response.status_code == 200, response.text
+    saved = db_session.get(ProgramSuggestion, suggestion["suggestion_id"])
+    assert saved.applied_response["blocos"][0]["duracao_min"] == 10

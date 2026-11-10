@@ -30,6 +30,7 @@ from app.services.programs import (
     ProgramValidationError,
     build_program_context,
     get_request_hash,
+    polish_suggested_program,
     validate_and_enrich_program,
 )
 
@@ -127,6 +128,7 @@ def suggest_program(
 
     try:
         draft = provider.suggest(context)
+        draft = polish_suggested_program(draft, context)
         draft = validate_and_enrich_program(draft, context)
     except AIServiceUnavailableError as exc:
         raise HTTPException(

@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    # Qual provedor de IA monta a programação (ver PROVIDER_FACTORIES).
+    ai_provider: str = "gemini"
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: int = 30
