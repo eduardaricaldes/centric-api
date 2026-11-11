@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin
+from app.models.playlist_song import PlaylistSong
 from app.models.song import Song
 from app.models.user import User
 from app.schemas.song import SongCreate, SongListResponse, SongResponse, SongUpdate
@@ -142,7 +143,15 @@ def delete_song(song_id: int, db:Session = Depends(get_db), admin: User = Depend
     song = db.query(Song).filter(Song.id == song_id).first()
     if not song:
         raise HTTPException(status_code= 404, detail="Song not found")
-    
+
+    # Sem isso o banco recusa pela chave estrangeira e a resposta vira 500.
+    in_playlist = db.query(PlaylistSong.id).filter(PlaylistSong.song_id == song_id).first()
+    if in_playlist is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Song is in a playlist",
+        )
+
     db.delete(song)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
