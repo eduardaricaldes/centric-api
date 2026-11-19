@@ -31,3 +31,4 @@ migrations/versions/*.pyc
 # Artefatos locais de análise de código
 graphify-out/
 .vercel
+node_modules
