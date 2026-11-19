@@ -62,3 +62,20 @@ def test_create_sem_chordpro_mantem_lyrics(client):
     assert response.status_code == 201
     assert response.json()["lyrics"] == "letra manual"
     assert response.json()["chordpro"] is None
+
+
+def test_excluir_musica_que_esta_em_repertorio_da_409(client, playlist_id, song_ids):
+    client.post(f"/playlist/{playlist_id}/songs/", json={"song_id": song_ids[0]})
+
+    response = client.delete(f"/songs/{song_ids[0]}")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Song is in a playlist"
+    assert client.get(f"/songs/{song_ids[0]}").status_code == 200
+
+
+def test_excluir_musica_fora_de_repertorio(client, song_ids):
+    response = client.delete(f"/songs/{song_ids[1]}")
+
+    assert response.status_code == 204
+    assert client.get(f"/songs/{song_ids[1]}").status_code == 404
