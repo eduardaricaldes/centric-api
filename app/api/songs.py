@@ -73,8 +73,11 @@ def get_songs(
 
     offset = (page - 1) * limit
 
+    # Sem ORDER BY o Postgres devolve as linhas na ordem física da tabela, que muda
+    # quando uma música é editada: a paginação mostrava a mesma música duas vezes.
     songs = (
         query
+        .order_by(Song.title, Song.id)
         .offset(offset)
         .limit(limit)
         .all()
