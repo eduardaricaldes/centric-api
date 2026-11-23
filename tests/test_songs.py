@@ -79,3 +79,83 @@ def test_excluir_musica_fora_de_repertorio(client, song_ids):
 
     assert response.status_code == 204
     assert client.get(f"/songs/{song_ids[1]}").status_code == 404
+
+
+
+def _ids_paginados(client, paginas, limit):
+    ids = []
+    for page in range(1, paginas + 1):
+        response = client.get("/songs/", params={"page": page, "limit": limit})
+        assert response.status_code == 200
+        ids.extend(item["id"] for item in response.json()["items"])
+    return ids
+
+
+def test_editar_letra_nao_muda_a_ordem_da_listagem(client):
+    """Regressão: sem ORDER BY, o Postgres devolvia a música editada no fim da
+    tabela. Quem já estava paginando via a mesma música em duas páginas (e outra
+    sumia), parecendo que a música tinha duplicado."""
+    titulos = ["Bondade de Deus", "Aleluia", "Descansarei", "Caminho", "Eu Navegarei", "Faz Chover"]
+    ids = {}
+    for titulo in titulos:
+        response = client.post("/songs/", json={"title": titulo, "lyrics": f"letra de {titulo}"})
+        assert response.status_code == 201
+        ids[titulo] = response.json()["id"]
+
+    esperado = [ids[t] for t in sorted(titulos)]
+    assert _ids_paginados(client, 3, 2) == esperado
+
+    # Editar a letra faz o Postgres gravar uma nova versão da linha no fim da tabela.
+    response = client.patch(f"/songs/{ids['Aleluia']}", json={"chordpro": "[G]Letra nova"})
+    assert response.status_code == 200
+
+    assert _ids_paginados(client, 3, 2) == esperado
+
+
+def test_lista_de_categorias(client):
+    response = client.get("/songs/categories")
+    assert response.status_code == 200
+    assert "Adoração" in response.json()
+
+
+def test_criar_musica_com_categoria_fora_da_lista_da_422(client):
+    response = client.post("/songs/", json={"title": "T", "lyrics": "L", "category": "Rock"})
+    assert response.status_code == 422
+
+
+def test_criar_musica_com_categoria_da_lista(client):
+    response = client.post("/songs/", json={"title": "T", "lyrics": "L", "category": "Ceia"})
+    assert response.status_code == 201
+    assert response.json()["category"] == "Ceia"
+
+
+def test_categoria_vazia_vira_sem_categoria(client):
+    response = client.post("/songs/", json={"title": "T", "lyrics": "L", "category": ""})
+    assert response.status_code == 201
+    assert response.json()["category"] is None
+
+
+def test_musica_com_categoria_antiga_continua_editavel(client, db_session):
+    """Músicas de antes da lista fechada guardam texto livre: editar a letra não pode quebrar."""
+    from app.models.song import Song
+
+    song = Song(title="Antiga", lyrics="L", category="adoracao livre")
+    db_session.add(song)
+    db_session.commit()
+
+    response = client.patch(f"/songs/{song.id}", json={"lyrics": "Nova", "category": "adoracao livre"})
+    assert response.status_code == 200
+
+    response = client.patch(f"/songs/{song.id}", json={"category": "Outra livre"})
+    assert response.status_code == 422
+
+    response = client.patch(f"/songs/{song.id}", json={"category": "Adoração"})
+    assert response.status_code == 200
+    assert response.json()["category"] == "Adoração"
+
+
+def test_filtrar_listagem_por_categoria(client, song_ids):
+    client.post("/songs/", json={"title": "Pão da Vida", "lyrics": "L", "category": "Ceia"})
+    response = client.get("/songs/", params={"category": "Ceia"})
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()["items"]] == ["Pão da Vida"]
