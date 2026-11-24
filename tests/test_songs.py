@@ -191,3 +191,26 @@ def test_slides_ajustados_sao_salvos_e_voltam_ao_automatico_quando_a_letra_muda(
 def test_slides_vazios_viram_automatico(client):
     song = client.post("/songs/", json={"title": "S", "lyrics": "A", "slides": "  "}).json()
     assert song["slides"] is None
+
+
+def test_versoes_da_musica_por_artista(client):
+    """Card "versões": a mesma música com artista, tom e arranjo próprios."""
+    original = client.post(
+        "/songs/",
+        json={"title": "Ele é a Glória", "lyrics": "L", "artist": "Gabriela Rocha", "tone": "A"},
+    ).json()
+    banda = client.post(
+        "/songs/",
+        json={
+            "title": "Ele é a Glória",
+            "lyrics": "L",
+            "artist": "Matheus Rizzo",
+            "tone": "G",
+            "arrangement": "Começa só voz e violão; banda entra no refrão.",
+        },
+    ).json()
+    assert banda["arrangement"].startswith("Começa")
+
+    versions = client.get("/songs/same-title", params={"title": "Ele é a Glória"}).json()
+    assert {(v["artist"], v["tone"]) for v in versions} == {("Gabriela Rocha", "A"), ("Matheus Rizzo", "G")}
+    assert {v["id"] for v in versions} == {original["id"], banda["id"]}

@@ -22,6 +22,8 @@ class Song(Base):
     # Slides da projeção ajustados à mão: só letra, slides separados por linha em
     # branco. None = automático (uma estrofe por slide).
     slides: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Arranjo desta versão (dinâmica, entradas). Versões = músicas com o mesmo título.
+    arrangement: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     playlist_items = relationship("PlaylistSong", back_populates="song")
 

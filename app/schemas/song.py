@@ -12,12 +12,14 @@ class SongBase(BaseModel):
     category: Optional[str] = Field(default=None, max_length=100)
     duration_min: Optional[int] = Field(default=None, ge=1)
     slides: Optional[str] = None
+    arrangement: Optional[str] = None
 
 class SongCreate(SongBase):
     pass
 
 class SongUpdate(BaseModel):
     slides: Optional[str] = None
+    arrangement: Optional[str] = None
     title: Optional[str] = None
     lyrics: Optional[str] = None
     chordpro: Optional[str] = None
@@ -44,6 +46,7 @@ class SongViewResponse(BaseModel):
     category: Optional[str] = None
     duration_min: Optional[int] = None
     slides: Optional[str] = None
+    arrangement: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
