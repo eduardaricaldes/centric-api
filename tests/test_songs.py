@@ -159,3 +159,13 @@ def test_filtrar_listagem_por_categoria(client, song_ids):
     response = client.get("/songs/", params={"category": "Ceia"})
     assert response.status_code == 200
     assert [item["title"] for item in response.json()["items"]] == ["Pão da Vida"]
+
+
+def test_mesmo_titulo_ignora_acento_e_caixa(client):
+    client.post("/songs/", json={"title": "Ele é a Glória", "lyrics": "L"})
+    client.post("/songs/", json={"title": "Ele", "lyrics": "L"})
+
+    response = client.get("/songs/same-title", params={"title": "ele e a gloria!"})
+
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()] == ["Ele é a Glória"]

@@ -1,3 +1,5 @@
+import re
+import unicodedata
 from typing import Literal, Optional
 
 from fastapi import Depends, APIRouter, File, HTTPException, Query, Request, Response, UploadFile, status
@@ -16,6 +18,7 @@ from app.schemas.song import (
     SongListResponse,
     SongResponse,
     SongUpdate,
+    SongViewResponse,
 )
 from app.services.ai_service import AIInvalidResponseError, AIServiceUnavailableError
 from app.services.chordpro import to_plain_lyrics
@@ -63,6 +66,27 @@ def validate_category(data: dict, current: str | None = None) -> None:
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=f"Categoria inválida. Use uma destas: {', '.join(SONG_CATEGORIES)}",
     )
+
+
+def normalize_title(title: str) -> str:
+    decomposed = unicodedata.normalize("NFD", title)
+    no_accents = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", no_accents.lower()).split())
+
+
+# SAME TITLE: aviso "essa música já existe" antes de salvar (ignora acento e caixa).
+@songs_router.get("/same-title", response_model=list[SongViewResponse])
+def songs_with_same_title(
+    title: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    wanted = normalize_title(title)
+    if not wanted:
+        return []
+    # O catálogo é pequeno (centenas): comparar em Python evita depender da extensão unaccent.
+    songs = db.query(Song).order_by(Song.title, Song.id).all()
+    return [song for song in songs if normalize_title(song.title) == wanted]
 
 
 # CATEGORIES (antes de /{song_id} para não ser lida como id)
