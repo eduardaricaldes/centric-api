@@ -10,3 +10,4 @@ from app.models.user import User as User
 from app.models.playlist import Playlist as Playlist
 from app.models.playlist_song import PlaylistSong as PlaylistSong
 from app.models.share_link import ShareLink as ShareLink
+from app.models.live_state import LiveState as LiveState
