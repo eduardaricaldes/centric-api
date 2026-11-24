@@ -48,6 +48,22 @@ def resolve_read_view(
         )
     return selected_view
 
+def normalize_slides(data: dict, current_song: Song | None = None) -> None:
+    """Slides vazios voltam ao automático. Mudou a letra sem mandar slides novos?
+
+    Os slides antigos ficariam com a letra velha no telão, então voltam ao automático.
+    """
+    if "slides" in data and data["slides"] is not None and not data["slides"].strip():
+        data["slides"] = None
+    if current_song is None or "slides" in data:
+        return
+    lyrics_changed = ("chordpro" in data and data["chordpro"] != current_song.chordpro) or (
+        "lyrics" in data and data["lyrics"] != current_song.lyrics
+    )
+    if lyrics_changed:
+        data["slides"] = None
+
+
 def validate_category(data: dict, current: str | None = None) -> None:
     """Só aceita categorias da lista fechada. String vazia vira "sem categoria".
 
@@ -146,6 +162,7 @@ async def import_song_file(
 def create_song(payload: SongCreate, db: Session = Depends(get_db), editor: User = Depends(require_song_editor)):
     data = payload.model_dump()
     validate_category(data)
+    normalize_slides(data)
     if data.get("chordpro"):
         data["lyrics"] = to_plain_lyrics(data["chordpro"])
     song = Song(**data)
@@ -248,6 +265,7 @@ def update_song(
 
     data = payload.model_dump()
     validate_category(data, current=song.category)
+    normalize_slides(data)
     if data.get("chordpro"):
         data["lyrics"] = to_plain_lyrics(data["chordpro"])
 
@@ -286,6 +304,7 @@ def patch_song(song_id: int, payload: SongUpdate, db: Session = Depends(get_db),
 
     update_data = payload.model_dump(exclude_unset=True)
     validate_category(update_data, current=song.category)
+    normalize_slides(update_data, current_song=song)
     if update_data.get("chordpro"):
         update_data["lyrics"] = to_plain_lyrics(update_data["chordpro"])
 

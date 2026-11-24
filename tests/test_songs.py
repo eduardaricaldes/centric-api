@@ -169,3 +169,25 @@ def test_mesmo_titulo_ignora_acento_e_caixa(client):
 
     assert response.status_code == 200
     assert [item["title"] for item in response.json()] == ["Ele é a Glória"]
+
+
+def test_slides_ajustados_sao_salvos_e_voltam_ao_automatico_quando_a_letra_muda(client):
+    song = client.post("/songs/", json={"title": "S", "lyrics": "A\nB\n\nC"}).json()
+    assert song["slides"] is None
+
+    response = client.patch(f"/songs/{song['id']}", json={"slides": "A\n\nB\nC"})
+    assert response.status_code == 200
+    assert response.json()["slides"] == "A\n\nB\nC"
+
+    # Editar só o título mantém os slides.
+    response = client.patch(f"/songs/{song['id']}", json={"title": "S2"})
+    assert response.json()["slides"] == "A\n\nB\nC"
+
+    # Mudar a letra sem mandar slides volta ao automático.
+    response = client.patch(f"/songs/{song['id']}", json={"lyrics": "Nova"})
+    assert response.json()["slides"] is None
+
+
+def test_slides_vazios_viram_automatico(client):
+    song = client.post("/songs/", json={"title": "S", "lyrics": "A", "slides": "  "}).json()
+    assert song["slides"] is None
