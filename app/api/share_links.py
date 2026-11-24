@@ -1,9 +1,12 @@
 import secrets
+from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.core.rate_limit import limiter
 from app.models.event import Event
@@ -48,6 +51,22 @@ def load_target(
     return None, event
 
 
+# A igreja fica em Florianópolis: o "dia" do culto é o dia local, não o UTC.
+CHURCH_TZ = ZoneInfo("America/Sao_Paulo")
+
+
+def event_link_expires_on(event: Event | None) -> date | None:
+    if event is None:
+        return None
+    return event.date + timedelta(days=settings.share_link_event_expiry_days)
+
+
+def link_response(link: ShareLink) -> ShareLinkResponse:
+    data = ShareLinkResponse.model_validate(link)
+    data.expires_on = event_link_expires_on(link.event) if link.kind == ShareLinkKind.EVENT else None
+    return data
+
+
 def active_links_query(db: Session, song_id: int | None, event_id: int | None):
     query = db.query(ShareLink).filter(ShareLink.revoked_at.is_(None))
     if song_id is not None:
@@ -77,7 +96,7 @@ def create_share_link(
     )
     if existing is not None:
         response.status_code = status.HTTP_200_OK
-        return existing
+        return link_response(existing)
 
     link = ShareLink(
         token=generate_share_token(),
@@ -89,7 +108,7 @@ def create_share_link(
     db.add(link)
     db.commit()
     db.refresh(link)
-    return link
+    return link_response(link)
 
 
 @share_links_router.get("/", response_model=ShareLinkListResponse)
@@ -113,7 +132,7 @@ def list_share_links(
         .order_by(ShareLink.created_at.desc())
         .all()
     )
-    return {"total": len(links), "items": links}
+    return {"total": len(links), "items": [link_response(link) for link in links]}
 
 
 @share_links_router.delete("/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -185,5 +204,9 @@ def read_share_link(
         .filter(Event.id == link.event_id)
         .first()
     )
+    expires_on = event_link_expires_on(event)
+    if expires_on is not None and utcnow().astimezone(CHURCH_TZ).date() > expires_on:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link expired")
+
     songs = [public_song(item.song) for item in event.playlist.songs] if event.playlist else []
     return PublicEventShare(title=event.title, date=event.date, songs=songs)
