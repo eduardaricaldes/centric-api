@@ -52,19 +52,32 @@ def test_require_roles_aceita_apenas_papeis_configurados(current_user):
     assert exc_info.value.status_code == 403
 
 
-def test_leader_global_nao_recebe_acesso_admin_sem_escopo_de_ministerio(
+def test_leader_global_cria_e_edita_musica_mas_nao_exclui(
     client,
     db_session,
 ):
+    """Decisão de 19/11: líder cria e edita música; excluir continua só admin."""
     leader = create_user(db_session, "route-leader@example.com", UserRole.LEADER)
     app.dependency_overrides.pop(require_admin)
     app.dependency_overrides[get_current_user] = lambda: leader
 
-    response = client.post(
-        "/songs/",
-        json={"title": "Restrita", "lyrics": "Letra"},
-    )
+    response = client.post("/songs/", json={"title": "Do líder", "lyrics": "Letra"})
+    assert response.status_code == 201
+    song_id = response.json()["id"]
 
+    response = client.patch(f"/songs/{song_id}", json={"lyrics": "Letra nova"})
+    assert response.status_code == 200
+
+    response = client.delete(f"/songs/{song_id}")
+    assert response.status_code == 403
+
+
+def test_membro_nao_cria_musica(client, db_session):
+    member = create_user(db_session, "route-member@example.com", UserRole.MEMBER)
+    app.dependency_overrides.pop(require_admin)
+    app.dependency_overrides[get_current_user] = lambda: member
+
+    response = client.post("/songs/", json={"title": "Restrita", "lyrics": "Letra"})
     assert response.status_code == 403
 
 

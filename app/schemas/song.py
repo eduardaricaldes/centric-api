@@ -51,3 +51,14 @@ class SongListResponse(BaseModel):
     page: int
     limit: int
     items: list[SongViewResponse]
+
+
+class SongImportResponse(BaseModel):
+    """Rascunho para o formulário "Nova música". Nada foi salvo ainda."""
+
+    title: str
+    artist: Optional[str] = None
+    tone: Optional[str] = None
+    chordpro: str
+    lyrics: str
+    used_ai: bool

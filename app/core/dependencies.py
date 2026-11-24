@@ -60,6 +60,8 @@ def require_roles(*roles: UserRole | str):
 
 
 require_admin = require_roles(UserRole.ADMIN)
+# Líder cria, importa e edita música; excluir continua só admin (decisão de 19/11).
+require_song_editor = require_roles(UserRole.ADMIN, UserRole.LEADER)
 
 
 def require_ministry_leader(
