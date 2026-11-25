@@ -24,6 +24,8 @@ class ShareLinkResponse(BaseModel):
     song_id: int | None = None
     event_id: int | None = None
     created_at: datetime
+    # Só links de evento expiram: último dia em que o link ainda abre.
+    expires_on: date | None = None
 
     model_config = {"from_attributes": True}
 

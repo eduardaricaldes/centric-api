@@ -74,3 +74,18 @@ Depois disso, todo o resto se faz pela tela: ministérios, convites e papéis.
   agende um `pg_dump` diário ou suba de plano.
 - **Rate limit:** a contagem fica em memória, por instância. Em serverless ela freia um ataque, mas não
   garante o limite exato.
+
+## Projeção: celular segue o telão (Fase 4)
+
+O operador manda o slide atual para `PUT /events/{id}/live`. O celular, aberto pelo link público do evento,
+acompanha de dois jeitos:
+
+- **WebSocket** em `/public/live/{token}/ws`: aviso na hora. Só funciona com a API rodando num servidor que
+  segura conexão aberta (VPS com `uvicorn`, por exemplo a da Hostinger). As conexões ficam na memória do
+  processo, então rode **um processo só** (`uvicorn app.main:app`, sem `--workers`).
+- **Pergunta a cada 3 segundos** em `GET /public/live/{token}`: é o que acontece na Vercel, que não segura
+  WebSocket. O site cai nesse modo sozinho.
+
+O telão não depende de nada disso: ele conversa com o operador pelo navegador, sem internet.
+
+`SHARE_LINK_EVENT_EXPIRY_DAYS` (padrão `3`): quantos dias depois do culto o link público do evento ainda abre.

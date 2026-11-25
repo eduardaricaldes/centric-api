@@ -1,4 +1,7 @@
+from datetime import date, timedelta
 import pytest
+
+from app.core.config import settings
 
 from app.core.dependencies import get_current_user
 from app.core.rate_limit import limiter
@@ -11,6 +14,9 @@ from app.models.user import User
 
 SONG_KEYS = {"title", "artist", "tone", "lyrics", "chordpro"}
 
+
+# Link de evento expira dias depois do culto: os testes usam um culto na semana que vem.
+EVENT_DATE = (date.today() + timedelta(days=7)).isoformat()
 
 def create_user(db_session, email: str, role: UserRole = UserRole.MEMBER) -> User:
     user = User(
@@ -32,7 +38,7 @@ def act_as(user: User) -> None:
 def create_event(client, **overrides) -> dict:
     payload = {
         "title": "Culto de domingo",
-        "date": "2026-10-04",
+        "date": EVENT_DATE,
         "time": "19:00:00",
         "type": "CULTO",
     }
@@ -67,7 +73,7 @@ def worship_event(client, db_session):
 
     playlist = client.post(
         "/playlist/",
-        json={"title": "Repertório", "date": "2026-10-04", "event_id": event["id"]},
+        json={"title": "Repertório", "date": EVENT_DATE, "event_id": event["id"]},
     ).json()
     for song in [second, first]:
         client.post(f"/playlist/{playlist['id']}/songs/", json={"song_id": song["id"]})
@@ -293,7 +299,7 @@ def test_publico_le_repertorio_do_evento_na_ordem(
     body = response.json()
     assert body["kind"] == "event"
     assert body["title"] == "Culto de domingo"
-    assert body["date"] == "2026-10-04"
+    assert body["date"] == EVENT_DATE
     assert [song["title"] for song in body["songs"]] == ["Segunda", "Primeira"]
     assert body["songs"][0]["chordpro"] is None
     assert body["songs"][0]["lyrics"] == "só letra"
@@ -395,3 +401,29 @@ def test_rota_publica_bloqueia_apos_60_leituras_por_minuto(
         assert unauthenticated_client.get("/public/share/" + "x" * 43).status_code == 404
 
     assert unauthenticated_client.get("/public/share/" + "x" * 43).status_code == 429
+
+
+def test_link_de_evento_expira_dias_depois_do_culto(client, unauthenticated_client):
+    past = (date.today() - timedelta(days=settings.share_link_event_expiry_days + 1)).isoformat()
+    event = create_event(client, date=past)
+    created = client.post("/share-links/", json={"event_id": event["id"]}).json()
+    assert created["expires_on"] < date.today().isoformat()
+
+    response = unauthenticated_client.get(f"/public/share/{created['token']}")
+    assert response.status_code == 410
+
+
+def test_link_de_evento_vale_ate_o_ultimo_dia(client, unauthenticated_client):
+    last_day = (date.today() - timedelta(days=settings.share_link_event_expiry_days)).isoformat()
+    event = create_event(client, date=last_day)
+    created = client.post("/share-links/", json={"event_id": event["id"]}).json()
+    assert created["expires_on"] == date.today().isoformat()
+
+    response = unauthenticated_client.get(f"/public/share/{created['token']}")
+    assert response.status_code == 200
+
+
+def test_link_de_musica_nao_expira(client):
+    song = create_song(client)
+    created = client.post("/share-links/", json={"song_id": song["id"]}).json()
+    assert created["expires_on"] is None

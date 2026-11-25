@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
     # Ordem da cadeia de provedores de IA (ver PROVIDER_FACTORIES). Cada um
     # só entra se a chave dele estiver configurada. Todos no plano gratuito.
+    # Link público de evento para de abrir N dias depois do culto (direito autoral).
+    share_link_event_expiry_days: int = 3
     ai_provider: str = "gemini,groq,openrouter"
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.5-flash-lite"
